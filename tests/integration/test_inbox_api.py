@@ -23,7 +23,26 @@ def test_first_request_returns_immediately_then_the_background_sync_fills_data(a
     assert [e["id"].split(":")[1] for e in data] == ["m2", "m1"]  # newest first
     assert data[1]["summary"] == "S" and data[1]["category"] == "Urgent / Action Required"
     assert data[0]["account_id"] == account.id
-    assert {"id", "account_id", "sender", "subject", "body", "score", "category", "date", "summary", "task", "reason", "category_source", "is_done", "snoozed_until", "thread_id", "sender_address", "unsubscribe_url", "unsubscribe_one_click"} == set(data[0])
+    assert {
+        "id",
+        "account_id",
+        "sender",
+        "subject",
+        "body",
+        "score",
+        "category",
+        "date",
+        "summary",
+        "task",
+        "reason",
+        "category_source",
+        "is_done",
+        "snoozed_until",
+        "thread_id",
+        "sender_address",
+        "unsubscribe_url",
+        "unsubscribe_one_click",
+    } == set(data[0])
 
 
 def test_no_mailboxes_means_no_emails_and_no_sync(auth_client):

@@ -43,7 +43,10 @@ def _vectors(texts, task_type):
 
 def test_embed_pending_stores_normalised_vectors_in_batches(db, account):
     repo.upsert_many(db, [stored_email(account, str(i)) for i in range(5)])
-    with patch.object(embeddings, "embed_texts", side_effect=_vectors) as embed, patch.object(embeddings, "BATCH_SIZE", 2):
+    with (
+        patch.object(embeddings, "embed_texts", side_effect=_vectors) as embed,
+        patch.object(embeddings, "BATCH_SIZE", 2),
+    ):
         assert embeddings.embed_pending(db, account.id) == 5
 
     assert embed.call_count == 3  # 5 emails, batches of 2
@@ -55,7 +58,10 @@ def test_embed_pending_stores_normalised_vectors_in_batches(db, account):
 
 
 def test_embed_pending_only_does_what_is_missing(db, account):
-    repo.upsert_many(db, [stored_email(account, "done", embedding=embeddings.pack([1.0, 0.0])), stored_email(account, "todo")])
+    repo.upsert_many(
+        db,
+        [stored_email(account, "done", embedding=embeddings.pack([1.0, 0.0])), stored_email(account, "todo")],
+    )
     with patch.object(embeddings, "embed_texts", side_effect=_vectors) as embed:
         assert embeddings.embed_pending(db, account.id) == 1
     assert len(embed.call_args.args[0]) == 1
@@ -78,7 +84,10 @@ def test_a_failure_part_way_keeps_the_batches_already_done(db, account):
             raise outcome
         return _vectors(texts, task_type)
 
-    with patch.object(embeddings, "embed_texts", side_effect=flaky), patch.object(embeddings, "BATCH_SIZE", 2):
+    with (
+        patch.object(embeddings, "embed_texts", side_effect=flaky),
+        patch.object(embeddings, "BATCH_SIZE", 2),
+    ):
         assert embeddings.embed_pending(db, account.id) == 2
     assert len(repo.list_pending_embeddings(db, account.id, 100)) == 2
 

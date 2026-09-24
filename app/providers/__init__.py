@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from ..core.security import decrypt
 from ..db.models import MailAccount
 from .base import MailProvider, ProviderAuthError
@@ -6,7 +8,7 @@ from .microsoft import MicrosoftProvider
 
 __all__ = ["PROVIDERS", "MailProvider", "ProviderAuthError", "get_provider"]
 
-PROVIDERS = {
+PROVIDERS: dict[str, Callable[[str], MailProvider]] = {
     "google": GmailProvider,
     "microsoft": MicrosoftProvider,  # Outlook / Microsoft 365 (Graph API)
     # "imap": ImapProvider,        # Yahoo, iCloud, custom domains (planned)

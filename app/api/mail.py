@@ -8,12 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..core.config import TIMEFRAMES
+from ..core.security import LoginRateLimiter
 from ..db.models import Email, User
 from ..db.session import get_db
 from ..repositories import accounts as accounts_repo
 from ..repositories import emails as emails_repo
 from ..repositories import rules as rules_repo
-from ..core.security import LoginRateLimiter
 from ..schemas import (
     EmailListItem,
     EmailOut,
@@ -173,23 +173,36 @@ def list_newsletters(
 
 
 @router.post("/newsletters/unsubscribe", response_model=UnsubscribeResult)
-def unsubscribe(payload: UnsubscribeRequest, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def unsubscribe(
+    payload: UnsubscribeRequest, user: User = Depends(current_user), db: Session = Depends(get_db)
+):
     """Unsubscribes from a sender: automatically when it supports one-click, else by handing back its link.
 
     With `mute` the sender is also muted here, so its mail stops cluttering the inbox either way.
     """
     address = payload.sender_address.strip().lower()
-    group = next((g for g in emails_repo.newsletter_groups(db, user.id, MAX_HISTORY_DAYS, 1) if g["sender_address"] == address), None)
+    group = next(
+        (
+            g
+            for g in emails_repo.newsletter_groups(db, user.id, MAX_HISTORY_DAYS, 1)
+            if g["sender_address"] == address
+        ),
+        None,
+    )
     if group is None:
         raise HTTPException(status_code=404, detail="No mail from that sender")
 
     url = group["unsubscribe_url"]
     if not url:
-        result = UnsubscribeResult(method="none", ok=False, detail="This sender did not include an unsubscribe link.")
+        result = UnsubscribeResult(
+            method="none", ok=False, detail="This sender did not include an unsubscribe link."
+        )
     elif group["one_click"]:
         result = _try_one_click(url)
     else:
-        result = UnsubscribeResult(method="link", url=url, ok=True, detail="Open the link to finish unsubscribing.")
+        result = UnsubscribeResult(
+            method="link", url=url, ok=True, detail="Open the link to finish unsubscribing."
+        )
 
     if payload.mute:
         rules_repo.upsert(db, user.id, "sender", address, PROMOTIONAL)
@@ -205,11 +218,15 @@ def _try_one_click(url: str) -> UnsubscribeResult:
         detail = "The sender did not accept the automatic request."
     except UnsafeUrl as exc:
         logger.warning("Refused unsafe unsubscribe link: %s", exc)
-        return UnsubscribeResult(method="none", ok=False, detail=f"That link was not safe to open automatically ({exc}).")
+        return UnsubscribeResult(
+            method="none", ok=False, detail=f"That link was not safe to open automatically ({exc})."
+        )
     except requests.RequestException:
         logger.warning("One-click unsubscribe request failed", exc_info=True)
         detail = "The sender could not be reached."
-    return UnsubscribeResult(method="link", url=url, ok=True, detail=f"{detail} Open the link to finish unsubscribing.")
+    return UnsubscribeResult(
+        method="link", url=url, ok=True, detail=f"{detail} Open the link to finish unsubscribing."
+    )
 
 
 # --- smart search --------------------------------------------------------------------------------
@@ -279,5 +296,7 @@ def summarize_thread(email_id: str, user: User = Depends(current_user), db: Sess
         raise HTTPException(status_code=400, detail="This conversation has only one message.") from None
     except Exception:
         logger.exception("Thread summary failed")
-        raise HTTPException(status_code=502, detail="Could not summarise the conversation right now.") from None
+        raise HTTPException(
+            status_code=502, detail="Could not summarise the conversation right now."
+        ) from None
     return _thread_out(db, user, email)

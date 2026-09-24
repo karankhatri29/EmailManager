@@ -74,9 +74,7 @@ def match(specs: Iterable[RuleSpec], address: str, subject: str, body: str) -> R
 
 def describe(spec: RuleSpec) -> str:
     """Plain-English reason shown next to an email a rule decided."""
-    if spec.kind == "sender":
-        target = f"mail from {spec.pattern}"
-    elif spec.kind == "domain":
+    if spec.kind == "sender" or spec.kind == "domain":
         target = f"mail from {spec.pattern}"
     else:
         target = f"mail mentioning “{spec.pattern}”"

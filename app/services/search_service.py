@@ -29,8 +29,54 @@ MIN_SEMANTIC_SIMILARITY = 0.6  # below this, a mail with no keyword hit is not c
 RELATIVE_CUTOFF = 0.75  # embedding scores sit in a narrow band, so also drop hits far below the best one
 FIELD_WEIGHTS = {"subject": 3, "sender": 2, "body": 1}
 STOPWORDS = frozenset(
-    "the a an and or of to for from in on at by with about that this those these my me i we you it is are was were be "
-    "find show get all any mail email emails message messages please where what which when last".split()
+    [
+        "the",
+        "a",
+        "an",
+        "and",
+        "or",
+        "of",
+        "to",
+        "for",
+        "from",
+        "in",
+        "on",
+        "at",
+        "by",
+        "with",
+        "about",
+        "that",
+        "this",
+        "those",
+        "these",
+        "my",
+        "me",
+        "i",
+        "we",
+        "you",
+        "it",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "find",
+        "show",
+        "get",
+        "all",
+        "any",
+        "mail",
+        "email",
+        "emails",
+        "message",
+        "messages",
+        "please",
+        "where",
+        "what",
+        "which",
+        "when",
+        "last",
+    ]
 )
 
 
@@ -135,7 +181,11 @@ def keyword_score(email: Email, keywords: list[str]) -> float:
 
 def _bounds(plan: QueryPlan) -> tuple[datetime | None, datetime | None]:
     start = datetime.combine(plan.date_from, time.min, tzinfo=timezone.utc) if plan.date_from else None
-    end = datetime.combine(plan.date_to + timedelta(days=1), time.min, tzinfo=timezone.utc) if plan.date_to else None
+    end = (
+        datetime.combine(plan.date_to + timedelta(days=1), time.min, tzinfo=timezone.utc)
+        if plan.date_to
+        else None
+    )
     return start, end
 
 
@@ -183,10 +233,12 @@ def _rank(
 
     similarity: dict[str, float] = {}
     if query_vector is not None:
-        with_vectors = [e for e in candidates if e.embedding]
+        with_vectors = [(e, e.embedding) for e in candidates if e.embedding]
         if with_vectors:
-            matrix = np.stack([embeddings.unpack(e.embedding) for e in with_vectors])
-            similarity = {e.id: float(s) for e, s in zip(with_vectors, matrix @ query_vector, strict=True)}
+            matrix = np.stack([embeddings.unpack(blob) for _, blob in with_vectors])
+            similarity = {
+                e.id: float(s) for (e, _), s in zip(with_vectors, matrix @ query_vector, strict=True)
+            }
 
     hits = []
     for email in candidates:

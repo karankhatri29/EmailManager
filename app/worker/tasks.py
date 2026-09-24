@@ -4,6 +4,7 @@ from ..core.config import DEFAULT_TIMEFRAME
 from ..db.models import MailAccount
 from ..db.session import SessionLocal
 from ..repositories import accounts as accounts_repo
+from ..services.jobs import run_periodic_jobs
 from ..services.sync_service import sync_account
 from .celery_app import celery_app
 
@@ -29,3 +30,9 @@ def sync_inbox(timeframe: str = DEFAULT_TIMEFRAME) -> int:
         except Exception:
             logger.exception("Sync failed for account %s", account_id)
     return total
+
+
+@celery_app.task(name="app.worker.tasks.run_jobs")
+def run_jobs() -> dict[str, int]:
+    """Briefings, reminders and follow-up nudges (scheduled by Celery beat)."""
+    return run_periodic_jobs()

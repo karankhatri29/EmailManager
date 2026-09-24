@@ -1,5 +1,5 @@
 from datetime import date, datetime, timezone
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
@@ -206,8 +206,10 @@ class ActivityOut(BaseModel):
     status: str
     source: str
     email_id: str | None = None
+    remind_at: datetime | None = None
+    reminded_at: datetime | None = None
 
-    @field_validator("start_at", "end_at")
+    @field_validator("start_at", "end_at", "remind_at", "reminded_at")
     @classmethod
     def _utc(cls, value):
         return _as_utc(value)
@@ -219,8 +221,9 @@ class ActivityCreate(BaseModel):
     start_at: datetime | None = None
     end_at: datetime | None = None
     all_day: bool = False
+    remind_at: datetime | None = None
 
-    @field_validator("start_at", "end_at")
+    @field_validator("start_at", "end_at", "remind_at")
     @classmethod
     def _utc(cls, value):
         return _as_utc(value)
@@ -243,8 +246,9 @@ class ActivityUpdate(BaseModel):
     end_at: datetime | None = None
     all_day: bool | None = None
     status: Literal["todo", "done"] | None = None
+    remind_at: datetime | None = None  # null clears the reminder
 
-    @field_validator("start_at", "end_at")
+    @field_validator("start_at", "end_at", "remind_at")
     @classmethod
     def _utc(cls, value):
         return _as_utc(value)
@@ -294,3 +298,90 @@ class ThreadOut(BaseModel):
     messages: list[ThreadMessage]
     summary: str | None = None  # HTML built server-side from escaped text
     summary_current: bool = False  # False if the thread has grown since the summary was made
+
+
+# --- settings, briefing, notifications, follow-ups ---------------------------------------------
+
+
+class SettingsOut(BaseModel):
+    timezone: str
+    briefing_enabled: bool
+    briefing_hour: int
+    urgent_alerts: bool
+    reminder_emails: bool
+    followup_days: int
+    email_configured: bool  # whether this server can send email at all
+
+
+class SettingsUpdate(BaseModel):
+    timezone: str | None = Field(default=None, min_length=1, max_length=64)
+    briefing_enabled: bool | None = None
+    briefing_hour: int | None = Field(default=None, ge=0, le=23)
+    urgent_alerts: bool | None = None
+    reminder_emails: bool | None = None
+    followup_days: int | None = Field(default=None, ge=1, le=30)
+
+
+class BriefingOut(BaseModel):
+    """Today's briefing. Lists hold plain dicts (ids, titles, dates) rendered by the UI."""
+
+    date: str
+    greeting: str
+    overdue: list[dict[str, Any]]
+    today: list[dict[str, Any]]
+    upcoming: list[dict[str, Any]]
+    top_emails: list[dict[str, Any]]
+    promotions: dict[str, Any]
+    waiting: list[dict[str, Any]]
+    counts: dict[str, int]
+
+
+class BriefingSent(BaseModel):
+    sent_to: str
+
+
+class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    kind: str
+    title: str
+    body: str | None = None
+    ref: str | None = None
+    created_at: datetime
+    read_at: datetime | None = None
+
+    @field_validator("created_at", "read_at")
+    @classmethod
+    def _utc(cls, value):
+        return _as_utc(value)
+
+
+class NotificationList(BaseModel):
+    unread: int
+    items: list[NotificationOut]
+
+
+class MarkReadRequest(BaseModel):
+    ids: list[int] | None = None  # omit to mark everything read
+
+
+class FollowUpOut(BaseModel):
+    id: int
+    account_id: int
+    thread_id: str
+    subject: str
+    recipient: str
+    sent_at: datetime
+    status: str
+    nudge_at: datetime
+    waiting_days: int
+
+    @field_validator("sent_at", "nudge_at")
+    @classmethod
+    def _utc(cls, value):
+        return _as_utc(value)
+
+
+class SnoozeRequest(BaseModel):
+    days: int = Field(ge=1, le=30)

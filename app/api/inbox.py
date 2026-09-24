@@ -77,6 +77,8 @@ def get_graph_schedule(
     """The user's action items ordered by deadline tier (optionally for one mailbox)."""
     _check_account(db, user, account_id)
     rows = emails_repo.list_in_window(db, user.id, TIMEFRAMES[time_filter][1], account_id)
-    open_rows = [row for row in rows if emails_repo.is_open(row)]  # handled or snoozed mail is not an action item
+    open_rows = [
+        row for row in rows if emails_repo.is_open(row)
+    ]  # handled or snoozed mail is not an action item
     emails = [EmailOut.model_validate(row).model_dump() for row in open_rows]
     return build_scheduler_graph(emails)

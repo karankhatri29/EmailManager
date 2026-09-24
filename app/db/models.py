@@ -1,6 +1,17 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
@@ -56,12 +67,16 @@ class Email(Base):
     sender_address: Mapped[str] = mapped_column(String(320), default="", server_default="", index=True)
     thread_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)  # plain-English "why this category"
-    category_source: Mapped[str] = mapped_column(String(16), default="auto", server_default="auto")  # auto|rule|user
+    category_source: Mapped[str] = mapped_column(
+        String(16), default="auto", server_default="auto"
+    )  # auto|rule|user
     is_done: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     snoozed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     unsubscribe_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     unsubscribe_one_click: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
-    embedding: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)  # float32 vector for semantic search
+    embedding: Mapped[bytes | None] = mapped_column(
+        LargeBinary, nullable=True
+    )  # float32 vector for semantic search
 
 
 class SyncState(Base):

@@ -83,6 +83,7 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
 
     sync_interval_seconds: int = 300
+    jobs_interval_seconds: int = 60  # briefings, reminders and follow-up nudges are checked this often
     sync_max_workers: int = 4  # mailboxes synced concurrently
     # Run the periodic sync inside the API process (local dev without Redis).
     # Set to false when a Celery worker + beat does it instead.

@@ -3,6 +3,7 @@
 import array
 import logging
 from collections.abc import Sequence
+from typing import Any, cast
 
 import numpy as np
 from google import genai
@@ -43,10 +44,10 @@ def embed_texts(texts: list[str], task_type: str) -> list[list[float]]:
     client = genai.Client(api_key=settings.gemini_api_key or None)
     response = client.models.embed_content(
         model=settings.gemini_embedding_model,
-        contents=texts,
+        contents=cast("list[Any]", texts),
         config=types.EmbedContentConfig(task_type=task_type, output_dimensionality=DIMENSIONS),
     )
-    return [list(e.values) for e in response.embeddings]
+    return [list(e.values or []) for e in response.embeddings or []]
 
 
 def embed_query(query: str) -> np.ndarray | None:
@@ -66,12 +67,18 @@ def embed_pending(db: Session, account_id: int, limit: int = PENDING_PER_SYNC) -
     for start in range(0, len(pending), BATCH_SIZE):
         batch = pending[start : start + BATCH_SIZE]
         try:
-            vectors = embed_texts([email_text(e.subject, e.sender, e.body) for e in batch], "RETRIEVAL_DOCUMENT")
+            vectors = embed_texts(
+                [email_text(e.subject, e.sender, e.body) for e in batch], "RETRIEVAL_DOCUMENT"
+            )
         except Exception:
             logger.warning("Embedding batch failed; will retry next sync", exc_info=True)
             break
         emails_repo.set_embeddings(
-            db, {e.id: pack(normalise(np.asarray(v, dtype=np.float32))) for e, v in zip(batch, vectors, strict=True)}
+            db,
+            {
+                e.id: pack(normalise(np.asarray(v, dtype=np.float32)).tolist())
+                for e, v in zip(batch, vectors, strict=True)
+            },
         )
         done += len(batch)
     if done:

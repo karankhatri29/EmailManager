@@ -195,7 +195,10 @@ def test_list_message_ids_follows_pagination():
 
 def test_list_message_ids_stops_at_the_limit():
     svc = _paged_service(
-        [{"messages": [{"id": str(i)} for i in range(5)], "nextPageToken": "more"}, {"messages": [{"id": "x"}]}]
+        [
+            {"messages": [{"id": str(i)} for i in range(5)], "nextPageToken": "more"},
+            {"messages": [{"id": "x"}]},
+        ]
     )
     list_message_ids(svc, "Last 1 Month", limit=3)
     calls = svc.users().messages().list.call_args_list
@@ -278,9 +281,12 @@ def _sent_message(mid, ts, labels, to="them@x.com", subject="Proposal"):
 def _threads_service(threads):
     svc = MagicMock()
     svc.users().messages().list().execute.return_value = {
-        "messages": [{"id": f"m-{t}", "threadId": t} for t in threads] + [{"id": "dup", "threadId": next(iter(threads))}]
+        "messages": [{"id": f"m-{t}", "threadId": t} for t in threads]
+        + [{"id": "dup", "threadId": next(iter(threads))}]
     }
-    svc.users().threads().get.side_effect = lambda **kw: MagicMock(execute=lambda: {"messages": threads[kw["id"]]})
+    svc.users().threads().get.side_effect = lambda **kw: MagicMock(
+        execute=lambda: {"messages": threads[kw["id"]]}
+    )
     return svc
 
 
@@ -289,7 +295,10 @@ def test_sent_threads_report_who_has_the_last_word():
         {
             "waiting": [_sent_message("1", 100, ["SENT"])],
             "answered": [_sent_message("2", 100, ["SENT"]), _sent_message("3", 200, ["INBOX"])],
-            "you-again": [_sent_message("4", 100, ["INBOX"]), _sent_message("5", 300, ["SENT"], subject="Re: hi")],
+            "you-again": [
+                _sent_message("4", 100, ["INBOX"]),
+                _sent_message("5", 300, ["SENT"], subject="Re: hi"),
+            ],
         }
     )
     by_id = {t["thread_id"]: t for t in gmail.list_sent_threads(svc, 14)}
@@ -302,7 +311,9 @@ def test_sent_threads_report_who_has_the_last_word():
 
 
 def test_sent_threads_ignore_drafts_and_read_metadata_only():
-    svc = _threads_service({"t": [_sent_message("1", 100, ["SENT"]), _sent_message("2", 200, ["DRAFT", "SENT"])]})
+    svc = _threads_service(
+        {"t": [_sent_message("1", 100, ["SENT"]), _sent_message("2", 200, ["DRAFT", "SENT"])]}
+    )
     result = gmail.list_sent_threads(svc, 14)
     assert result[0]["awaiting"] is False  # the newest message is a draft, not something you sent
     assert svc.users().threads().get.call_args.kwargs["format"] == "metadata"

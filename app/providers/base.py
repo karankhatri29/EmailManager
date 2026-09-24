@@ -12,7 +12,7 @@ class MailProvider(Protocol):
     app/providers/__init__.py.
     """
 
-    def list_message_ids(self, timeframe: str) -> list[str]:
+    def list_message_ids(self, timeframe: str, limit: int | None = None) -> list[str]:
         """Ids of the messages in the timeframe (cheap: no message bodies)."""
 
     def fetch_message(self, message_id: str) -> dict:

@@ -342,7 +342,9 @@ def classify(subject, body):
             evidence.append(f"mentions a deadline ({_quote(deadline_markers)})")
 
     if evidence:
-        return Classification(_scaled(4.0, 4.1, len(evidence)), URGENT, "Needs action: " + "; ".join(evidence) + ".")
+        return Classification(
+            _scaled(4.0, 4.1, len(evidence)), URGENT, "Needs action: " + "; ".join(evidence) + "."
+        )
 
     # Rule 5: announcements, updates, information broadcasts
     notices = _matches(text_raw, NOTICE_MARKERS)

@@ -123,7 +123,9 @@ class MicrosoftProvider:
 
         message = self._get(
             f"/me/messages/{graph_id}",
-            params={"$select": "subject,from,body,bodyPreview,receivedDateTime,conversationId,internetMessageHeaders"},
+            params={
+                "$select": "subject,from,body,bodyPreview,receivedDateTime,conversationId,internetMessageHeaders"
+            },
             headers={"Prefer": 'outlook.body-content-type="text"'},
         )
         body = ((message.get("body") or {}).get("content") or "").strip() or message.get("bodyPreview", "")
@@ -137,8 +139,12 @@ class MicrosoftProvider:
         if message.get("conversationId"):
             result["thread_id"] = message["conversationId"]
 
-        headers = {h.get("name", "").lower(): h.get("value", "") for h in message.get("internetMessageHeaders") or []}
-        url, one_click = parse_list_unsubscribe(headers.get("list-unsubscribe"), headers.get("list-unsubscribe-post"))
+        headers = {
+            h.get("name", "").lower(): h.get("value", "") for h in message.get("internetMessageHeaders") or []
+        }
+        url, one_click = parse_list_unsubscribe(
+            headers.get("list-unsubscribe"), headers.get("list-unsubscribe-post")
+        )
         if url:
             result["unsubscribe_url"] = url
             result["unsubscribe_one_click"] = one_click

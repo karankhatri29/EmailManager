@@ -45,7 +45,7 @@ def generate_json(prompt, schema):
         contents=prompt,
         config=types.GenerateContentConfig(response_mime_type="application/json", response_schema=schema),
     )
-    return json.loads(response.text)
+    return json.loads(response.text or "{}")
 
 
 def generate_text(prompt):

@@ -6,10 +6,10 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from .api import accounts, activities, auth, calendar, inbox, mail, routes, rules
+from .api import account_tools, accounts, activities, auth, calendar, inbox, mail, routes, rules
 from .core.config import get_settings
 from .core.logging import configure_logging
-from .services.background import start_periodic_sync
+from .services.background import start_periodic_jobs, start_periodic_sync
 
 APP_DIR = Path(__file__).resolve().parent
 SESSION_MAX_AGE = 14 * 24 * 3600
@@ -18,9 +18,14 @@ SESSION_MAX_AGE = 14 * 24 * 3600
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
-    stop = start_periodic_sync(settings.sync_interval_seconds) if settings.inprocess_sync else None
+    stops = []
+    if settings.inprocess_sync:
+        stops = [
+            start_periodic_sync(settings.sync_interval_seconds),
+            start_periodic_jobs(settings.jobs_interval_seconds),
+        ]
     yield
-    if stop is not None:
+    for stop in stops:
         stop.set()
 
 
@@ -42,7 +47,7 @@ def create_app() -> FastAPI:
         https_only=settings.session_https_only,
     )
     app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
-    for module in (routes, auth, accounts, inbox, mail, rules, activities, calendar):
+    for module in (routes, auth, accounts, inbox, mail, rules, account_tools, activities, calendar):
         app.include_router(module.router)
     return app
 

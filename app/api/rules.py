@@ -27,7 +27,9 @@ def create_rule(payload: RuleIn, user: User = Depends(current_user), db: Session
         raise HTTPException(status_code=422, detail=str(exc)) from None
 
     if rules_repo.count_for_user(db, user.id) >= rules_repo.MAX_RULES_PER_USER:
-        raise HTTPException(status_code=422, detail=f"You can have at most {rules_repo.MAX_RULES_PER_USER} rules")
+        raise HTTPException(
+            status_code=422, detail=f"You can have at most {rules_repo.MAX_RULES_PER_USER} rules"
+        )
     if rules_repo.find(db, user.id, spec.kind, spec.pattern) is not None:
         raise HTTPException(status_code=409, detail="You already have a rule for that")
 

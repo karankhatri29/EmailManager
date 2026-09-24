@@ -144,7 +144,11 @@ def fetch_messages(service, message_ids, batch_size=BATCH_SIZE):
         batch.execute()
 
     for message_id, exception in failures.items():
-        if isinstance(exception, HttpError) and exception.resp is not None and exception.resp.status in (401, 403):
+        if (
+            isinstance(exception, HttpError)
+            and exception.resp is not None
+            and exception.resp.status in (401, 403)
+        ):
             raise exception
         results[message_id] = fetch_message(service, message_id)  # one retry, on its own
 
@@ -158,7 +162,10 @@ def list_sent_threads(service, days, limit=SENT_THREAD_LIMIT):
     Each item: thread_id, subject, recipient, sent_at, awaiting (True if nobody has answered yet).
     """
     results = (
-        service.users().messages().list(userId="me", q=f"in:sent newer_than:{days}d", maxResults=limit).execute()
+        service.users()
+        .messages()
+        .list(userId="me", q=f"in:sent newer_than:{days}d", maxResults=limit)
+        .execute()
     )
     thread_ids = list(dict.fromkeys(m["threadId"] for m in results.get("messages", []) if m.get("threadId")))
 
@@ -167,7 +174,9 @@ def list_sent_threads(service, days, limit=SENT_THREAD_LIMIT):
         thread = (
             service.users()
             .threads()
-            .get(userId="me", id=thread_id, format="metadata", metadataHeaders=["From", "To", "Cc", "Subject"])
+            .get(
+                userId="me", id=thread_id, format="metadata", metadataHeaders=["From", "To", "Cc", "Subject"]
+            )
             .execute()
         )
         messages = sorted(thread.get("messages", []), key=lambda m: int(m.get("internalDate", 0)))

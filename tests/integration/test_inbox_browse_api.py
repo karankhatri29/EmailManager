@@ -40,7 +40,12 @@ def test_filters_by_category_mailbox_sender_and_age(auth_client, db, user, accou
     from tests.conftest import make_account
 
     other = make_account(db, user, "second@gmail.com")
-    _seed(db, account, ("a", {"category": URGENT}), ("b", {"category": "Promotional", "sender": "Shop <s@shop.com>"}))
+    _seed(
+        db,
+        account,
+        ("a", {"category": URGENT}),
+        ("b", {"category": "Promotional", "sender": "Shop <s@shop.com>"}),
+    )
     repo.upsert_many(db, [stored_email(other, "c", date=_now(days=-20))])
 
     assert _ids(auth_client.get("/api/inbox", params={"category": URGENT})) == ["a"]
@@ -61,12 +66,20 @@ def test_keyword_search_matches_all_words_in_subject_sender_or_body(auth_client,
     )
     assert set(_ids(auth_client.get("/api/inbox", params={"q": "couch"}))) == {"invoice", "couch", "sender"}
     assert _ids(auth_client.get("/api/inbox", params={"q": "couch invoice"})) == ["invoice"]  # every word
-    assert _ids(auth_client.get("/api/inbox", params={"q": "COUCH   tuesday"})) == ["couch"]  # any case, any spacing
+    assert _ids(auth_client.get("/api/inbox", params={"q": "COUCH   tuesday"})) == [
+        "couch"
+    ]  # any case, any spacing
     assert _ids(auth_client.get("/api/inbox", params={"q": "zebra"})) == []
 
 
 def test_search_treats_wildcards_literally(auth_client, db, account):
-    _seed(db, account, ("pct", {"subject": "50% off"}), ("plain", {"subject": "500 items"}), ("und", {"subject": "a_b"}))
+    _seed(
+        db,
+        account,
+        ("pct", {"subject": "50% off"}),
+        ("plain", {"subject": "500 items"}),
+        ("und", {"subject": "a_b"}),
+    )
     assert _ids(auth_client.get("/api/inbox", params={"q": "50%"})) == ["pct"]
     assert _ids(auth_client.get("/api/inbox", params={"q": "a_b"})) == ["und"]
     assert _ids(auth_client.get("/api/inbox", params={"q": "%"})) == ["pct"]
@@ -94,7 +107,9 @@ def test_email_detail_is_private(auth_client, bob_client, db, account):
     _seed(db, account, ("m1", {"subject": "Hello", "body": "the full body"}))
     email_id = f"{account.id}:m1"
     detail = auth_client.get(f"/api/emails/{email_id}").json()
-    assert detail["body"] == "the full body" and detail["reason"] is None and detail["category_source"] == "auto"
+    assert (
+        detail["body"] == "the full body" and detail["reason"] is None and detail["category_source"] == "auto"
+    )
     assert bob_client.get(f"/api/emails/{email_id}").status_code == 404
     assert auth_client.get("/api/emails/9:nope").status_code == 404
 
@@ -117,8 +132,14 @@ def test_correcting_a_category_records_who_decided_and_why(auth_client, db, acco
     assert body["task"] is not None
 
 
-def test_correcting_to_important_creates_a_calendar_item_and_away_from_it_removes_it(auth_client, db, account):
-    _seed(db, account, ("m1", {"category": "General", "subject": "Report due", "body": "Please review the report."}))
+def test_correcting_to_important_creates_a_calendar_item_and_away_from_it_removes_it(
+    auth_client, db, account
+):
+    _seed(
+        db,
+        account,
+        ("m1", {"category": "General", "subject": "Report due", "body": "Please review the report."}),
+    )
     url = f"/api/emails/{account.id}:m1"
 
     auth_client.patch(url, json={"category": URGENT})
@@ -153,7 +174,9 @@ def test_apply_to_sender_makes_a_rule_and_reclassifies_their_other_mail(auth_cli
         ("mine", {"sender": shop, "category": "Important", "category_source": "user"}),
         ("elsewhere", {"sender": "Bob <bob@x.com>", "category": "General"}),
     )
-    r = auth_client.patch(f"/api/emails/{account.id}:a", json={"category": "Promotional", "apply_to_sender": True})
+    r = auth_client.patch(
+        f"/api/emails/{account.id}:a", json={"category": "Promotional", "apply_to_sender": True}
+    )
     assert r.status_code == 200
 
     def category(mid):
@@ -165,7 +188,9 @@ def test_apply_to_sender_makes_a_rule_and_reclassifies_their_other_mail(auth_cli
     assert category("mine")["category"] == "Important"  # a decision you made by hand is never overridden
     assert category("elsewhere")["category"] == "General"
     rules = auth_client.get("/api/rules").json()
-    assert [(r["kind"], r["pattern"], r["category"]) for r in rules] == [("sender", "deals@shop.com", "Promotional")]
+    assert [(r["kind"], r["pattern"], r["category"]) for r in rules] == [
+        ("sender", "deals@shop.com", "Promotional")
+    ]
 
 
 # --- done and snooze -----------------------------------------------------------------------------
@@ -186,7 +211,10 @@ def test_done_mail_leaves_the_open_list_and_completes_its_calendar_item(auth_cli
 
     auth_client.patch(url, json={"is_done": False})
     db.expire_all()
-    assert set(_ids(auth_client.get("/api/inbox"))) == {"m1", "m2"} and db.get(Activity, activity.id).status == "todo"
+    assert (
+        set(_ids(auth_client.get("/api/inbox"))) == {"m1", "m2"}
+        and db.get(Activity, activity.id).status == "todo"
+    )
 
 
 def test_snoozed_mail_hides_until_its_time_then_returns(auth_client, db, account):

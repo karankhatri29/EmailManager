@@ -23,13 +23,17 @@ def test_sender_rule_reclassifies_existing_mail_and_explains_itself(auth_client,
     boss = "Boss <boss@work.com>"
     _seed(db, account, ("a", {"sender": boss}), ("b", {"sender": boss}), ("c", {"sender": "Bob <bob@x.com>"}))
 
-    r = auth_client.post("/api/rules", json={"kind": "sender", "pattern": "Boss@Work.com", "category": URGENT})
+    r = auth_client.post(
+        "/api/rules", json={"kind": "sender", "pattern": "Boss@Work.com", "category": URGENT}
+    )
     body = r.json()
     assert r.status_code == 201 and body["pattern"] == "boss@work.com" and body["affected"] == 2
 
     a = _get(auth_client, account, "a")
-    assert a["category"] == URGENT and a["category_source"] == "rule" and a["reason"] == (
-        "Your rule: mail from boss@work.com is always Urgent / Action Required."
+    assert (
+        a["category"] == URGENT
+        and a["category_source"] == "rule"
+        and a["reason"] == ("Your rule: mail from boss@work.com is always Urgent / Action Required.")
     )
     assert a["task"] is not None
     assert _get(auth_client, account, "c")["category"] == "General"
@@ -44,37 +48,65 @@ def test_domain_and_keyword_rules(auth_client, db, account):
         ("k", {"subject": "Your invoice is ready", "sender": "X <x@y.com>"}),
         ("n", {"subject": "Hello", "sender": "X <x@y.com>"}),
     )
-    assert auth_client.post("/api/rules", json={"kind": "domain", "pattern": "shop.com", "category": "Promotional"}).json()["affected"] == 1
-    assert auth_client.post("/api/rules", json={"kind": "keyword", "pattern": "invoice", "category": "Important"}).json()["affected"] == 1
+    assert (
+        auth_client.post(
+            "/api/rules", json={"kind": "domain", "pattern": "shop.com", "category": "Promotional"}
+        ).json()["affected"]
+        == 1
+    )
+    assert (
+        auth_client.post(
+            "/api/rules", json={"kind": "keyword", "pattern": "invoice", "category": "Important"}
+        ).json()["affected"]
+        == 1
+    )
     assert _get(auth_client, account, "d")["category"] == "Promotional"
     assert _get(auth_client, account, "k")["category"] == "Important"
     assert _get(auth_client, account, "n")["category"] == "General"
 
 
 def test_rules_never_override_your_own_corrections(auth_client, db, account):
-    _seed(db, account, ("mine", {"sender": "Shop <s@shop.com>", "category": "Important", "category_source": "user"}))
-    r = auth_client.post("/api/rules", json={"kind": "sender", "pattern": "s@shop.com", "category": "Promotional"})
+    _seed(
+        db,
+        account,
+        ("mine", {"sender": "Shop <s@shop.com>", "category": "Important", "category_source": "user"}),
+    )
+    r = auth_client.post(
+        "/api/rules", json={"kind": "sender", "pattern": "s@shop.com", "category": "Promotional"}
+    )
     assert r.json()["affected"] == 0
     assert _get(auth_client, account, "mine")["category"] == "Important"
 
 
 def test_muting_a_sender_removes_its_open_calendar_items(auth_client, db, account):
-    _seed(db, account, ("a", {"sender": "Shop <s@shop.com>", "category": URGENT, "subject": "Task", "body": "pay now"}))
+    _seed(
+        db,
+        account,
+        ("a", {"sender": "Shop <s@shop.com>", "category": URGENT, "subject": "Task", "body": "pay now"}),
+    )
     auth_client.patch(f"/api/emails/{account.id}:a", json={"is_done": False})
     from app.services.activities_service import create_activities_for_emails
     from tests.conftest import stored_email as se
 
-    create_activities_for_emails(db, [se(account, "a", category=URGENT, subject="Task", body="pay now", sender="Shop <s@shop.com>")])
+    create_activities_for_emails(
+        db, [se(account, "a", category=URGENT, subject="Task", body="pay now", sender="Shop <s@shop.com>")]
+    )
     assert db.query(Activity).count() == 1
 
-    auth_client.post("/api/rules", json={"kind": "sender", "pattern": "s@shop.com", "category": "Promotional"})
+    auth_client.post(
+        "/api/rules", json={"kind": "sender", "pattern": "s@shop.com", "category": "Promotional"}
+    )
     db.expire_all()
     assert db.query(Activity).count() == 0
 
 
 def test_deleting_a_rule_hands_its_mail_back_to_the_classifier(auth_client, db, account):
-    _seed(db, account, ("a", {"sender": "Boss <boss@work.com>", "subject": "Hello", "body": "Lunch was great"}))
-    rule = auth_client.post("/api/rules", json={"kind": "sender", "pattern": "boss@work.com", "category": URGENT}).json()
+    _seed(
+        db, account, ("a", {"sender": "Boss <boss@work.com>", "subject": "Hello", "body": "Lunch was great"})
+    )
+    rule = auth_client.post(
+        "/api/rules", json={"kind": "sender", "pattern": "boss@work.com", "category": URGENT}
+    ).json()
     assert _get(auth_client, account, "a")["category"] == URGENT
 
     assert auth_client.delete(f"/api/rules/{rule['id']}").status_code == 204
@@ -86,8 +118,12 @@ def test_deleting_a_rule_hands_its_mail_back_to_the_classifier(auth_client, db, 
 
 def test_deleting_one_rule_leaves_other_rules_in_charge(auth_client, db, account):
     _seed(db, account, ("a", {"sender": "Boss <boss@work.com>"}))
-    domain = auth_client.post("/api/rules", json={"kind": "domain", "pattern": "work.com", "category": "Important"}).json()
-    sender = auth_client.post("/api/rules", json={"kind": "sender", "pattern": "boss@work.com", "category": URGENT}).json()
+    domain = auth_client.post(
+        "/api/rules", json={"kind": "domain", "pattern": "work.com", "category": "Important"}
+    ).json()
+    sender = auth_client.post(
+        "/api/rules", json={"kind": "sender", "pattern": "boss@work.com", "category": URGENT}
+    ).json()
     assert _get(auth_client, account, "a")["category"] == URGENT  # the sender rule is more specific
 
     auth_client.delete(f"/api/rules/{sender['id']}")
@@ -122,13 +158,25 @@ def test_invalid_rules_are_rejected(auth_client, payload):
 def test_rule_limit(auth_client, monkeypatch):
     monkeypatch.setattr("app.repositories.rules.MAX_RULES_PER_USER", 2)
     for word in ("alpha", "bravo"):
-        assert auth_client.post("/api/rules", json={"kind": "keyword", "pattern": word, "category": URGENT}).status_code == 201
-    assert auth_client.post("/api/rules", json={"kind": "keyword", "pattern": "charlie", "category": URGENT}).status_code == 422
+        assert (
+            auth_client.post(
+                "/api/rules", json={"kind": "keyword", "pattern": word, "category": URGENT}
+            ).status_code
+            == 201
+        )
+    assert (
+        auth_client.post(
+            "/api/rules", json={"kind": "keyword", "pattern": "charlie", "category": URGENT}
+        ).status_code
+        == 422
+    )
 
 
 def test_rules_are_private(auth_client, bob_client, db, account, bob_account):
     _seed(db, account, ("a", {"sender": "Boss <boss@work.com>"}))
-    rule = bob_client.post("/api/rules", json={"kind": "sender", "pattern": "boss@work.com", "category": URGENT}).json()
+    rule = bob_client.post(
+        "/api/rules", json={"kind": "sender", "pattern": "boss@work.com", "category": URGENT}
+    ).json()
 
     assert _get(auth_client, account, "a")["category"] == "General"  # Bob's rule does not touch Alice's mail
     assert auth_client.get("/api/rules").json() == []
@@ -140,8 +188,9 @@ def test_new_mail_is_classified_with_the_users_rules(auth_client, account, manag
     from tests.conftest import make_email, patch_provider
 
     auth_client.post("/api/rules", json={"kind": "sender", "pattern": "boss@work.com", "category": URGENT})
-    with patch_provider([make_email("m1", "Hello", "Lunch was great", sender="Boss <boss@work.com>")]), patch(
-        "app.services.sync_service.summarize_email", return_value="S"
+    with (
+        patch_provider([make_email("m1", "Hello", "Lunch was great", sender="Boss <boss@work.com>")]),
+        patch("app.services.sync_service.summarize_email", return_value="S"),
     ):
         auth_client.post("/api/sync")
         manager.wait(10)

@@ -190,10 +190,12 @@ def stored_email(account, message_id="m1", **extra):
 class FakeProvider:
     """Stands in for a mailbox provider."""
 
-    def __init__(self, raw_emails=(), refreshed=None, error=None):
+    def __init__(self, raw_emails=(), refreshed=None, error=None, sent_threads=(), sent_error=None):
         self.by_id = {e["id"]: e for e in raw_emails}
         self.refreshed = refreshed
         self.error = error
+        self.sent_threads = list(sent_threads)
+        self.sent_error = sent_error
         self.fetched: list[str] = []
         self.list_calls = 0
 
@@ -206,6 +208,11 @@ class FakeProvider:
     def fetch_message(self, message_id):
         self.fetched.append(message_id)
         return dict(self.by_id[message_id])
+
+    def list_sent_threads(self, days):
+        if self.sent_error:
+            raise self.sent_error
+        return list(self.sent_threads)
 
     def export_credentials(self):
         return self.refreshed

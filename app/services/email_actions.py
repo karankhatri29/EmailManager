@@ -36,7 +36,9 @@ def _refresh_activities(db: Session, changed: list[Email]) -> None:
     actionable = [e for e in changed if e.category in SUMMARIZED_CATEGORIES]
     if actionable:
         create_activities_for_emails(db, [_as_dict(e) for e in actionable])
-    activities_repo.delete_open_for_emails(db, [e.id for e in changed if e.category not in SUMMARIZED_CATEGORIES])
+    activities_repo.delete_open_for_emails(
+        db, [e.id for e in changed if e.category not in SUMMARIZED_CATEGORIES]
+    )
 
 
 def _set(email: Email, category: str, source: str, reason: str, score: float | None = None) -> bool:
@@ -61,7 +63,9 @@ def set_category(db: Session, email: Email, category: str, apply_to_sender: bool
 
     if apply_to_sender and email.sender_address:
         rules_repo.upsert(db, email.user_id, "sender", email.sender_address, category)
-        changed += [e for e in reapply_rules(db, email.user_id, "sender", email.sender_address) if e.id != email.id]
+        changed += [
+            e for e in reapply_rules(db, email.user_id, "sender", email.sender_address) if e.id != email.id
+        ]
 
     db.commit()
     _refresh_activities(db, changed)
@@ -78,7 +82,9 @@ def reapply_rules(db: Session, user_id: int, kind: str, pattern: str) -> list[Em
     for email in emails_repo.list_matching_rule(db, user_id, kind, pattern):
         if email.category_source == "user":
             continue
-        score, category, reason, source = classify_email(email.subject, email.body, email.sender_address, specs)
+        score, category, reason, source = classify_email(
+            email.subject, email.body, email.sender_address, specs
+        )
         if _set(email, category, source, reason, score):
             changed.append(email)
     db.commit()

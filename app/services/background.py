@@ -8,6 +8,7 @@ from ..core.config import DEFAULT_TIMEFRAME, get_settings
 from ..db.models import MailAccount
 from ..db.session import SessionLocal
 from ..repositories import accounts as accounts_repo
+from . import jobs
 from .sync_service import sync_account
 
 logger = logging.getLogger(__name__)
@@ -124,4 +125,17 @@ def start_periodic_sync(interval_seconds: float, timeframe: str = DEFAULT_TIMEFR
                 return
 
     threading.Thread(target=loop, daemon=True, name="mail-periodic-sync").start()
+    return stop
+
+
+def start_periodic_jobs(interval_seconds: float) -> threading.Event:
+    """Runs the recurring jobs (briefings, reminders, follow-up nudges) every `interval_seconds`."""
+    stop = threading.Event()
+
+    def loop() -> None:
+        logger.info("Periodic jobs started (every %ss)", interval_seconds)
+        while not stop.wait(interval_seconds):
+            jobs.run_periodic_jobs()
+
+    threading.Thread(target=loop, daemon=True, name="periodic-jobs").start()
     return stop

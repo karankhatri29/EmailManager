@@ -60,7 +60,10 @@ def test_public_https_link_is_accepted():
 
 def test_one_click_posts_the_rfc8058_body_without_following_redirects():
     response = MagicMock(status_code=200)
-    with _resolves_to("93.184.216.34"), patch.object(unsubscribe.requests, "post", return_value=response) as post:
+    with (
+        _resolves_to("93.184.216.34"),
+        patch.object(unsubscribe.requests, "post", return_value=response) as post,
+    ):
         assert one_click_unsubscribe("https://shop.com/unsub") is True
 
     assert post.call_args.kwargs["data"] == {"List-Unsubscribe": "One-Click"}
@@ -68,13 +71,22 @@ def test_one_click_posts_the_rfc8058_body_without_following_redirects():
     response.close.assert_called_once()
 
 
-@pytest.mark.parametrize("status,expected", [(200, True), (204, True), (302, False), (404, False), (500, False)])
+@pytest.mark.parametrize(
+    "status,expected", [(200, True), (204, True), (302, False), (404, False), (500, False)]
+)
 def test_only_2xx_counts_as_success(status, expected):
-    with _resolves_to("93.184.216.34"), patch.object(unsubscribe.requests, "post", return_value=MagicMock(status_code=status)):
+    with (
+        _resolves_to("93.184.216.34"),
+        patch.object(unsubscribe.requests, "post", return_value=MagicMock(status_code=status)),
+    ):
         assert one_click_unsubscribe("https://shop.com/unsub") is expected
 
 
 def test_nothing_is_sent_to_an_unsafe_link():
-    with _resolves_to("127.0.0.1"), patch.object(unsubscribe.requests, "post") as post, pytest.raises(UnsafeUrl):
+    with (
+        _resolves_to("127.0.0.1"),
+        patch.object(unsubscribe.requests, "post") as post,
+        pytest.raises(UnsafeUrl),
+    ):
         one_click_unsubscribe("https://shop.com/unsub")
     post.assert_not_called()

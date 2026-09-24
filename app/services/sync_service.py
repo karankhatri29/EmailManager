@@ -10,10 +10,11 @@ from ..providers import ProviderAuthError, get_provider
 from ..repositories import accounts as accounts_repo
 from ..repositories import emails as emails_repo
 from ..repositories import rules as rules_repo
-from . import embeddings
+from . import embeddings, followups
 from .activities_service import create_activities_for_emails
 from .ai_summarizer import summarize_email
 from .email_processor import process_emails
+from .notifier import notify_urgent
 from .rules import to_specs
 
 logger = logging.getLogger(__name__)
@@ -52,11 +53,17 @@ def sync_account(db: Session, account: MailAccount, timeframe: str) -> int:
 
     emails_repo.upsert_many(db, processed)
     create_activities_for_emails(db, processed)
+    notify_urgent(db, account.user_id, processed)
     emails_repo.mark_synced(db, account.id, timeframe)
     logger.info("Synced %s (%s): %d listed, %d new", account.email_address, timeframe, len(ids), len(raw))
 
     summarize_pending(db, account.id)
     embeddings.embed_pending(db, account.id)
+    try:
+        followups.sync_followups(db, account, provider)
+    except Exception:  # a side feature must never fail the mail sync
+        db.rollback()
+        logger.warning("Follow-up tracking failed for %s", account.email_address, exc_info=True)
     return len(raw)
 
 

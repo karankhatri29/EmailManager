@@ -26,9 +26,11 @@ def upsert_many(db: Session, emails: Iterable[dict]) -> None:
     db.commit()
 
 
-def list_in_window(db: Session, user_id: int, days: int, account_id: int | None = None) -> list[Email]:
+def list_in_window(
+    db: Session, user_id: int, days: int, account_id: int | None = None, now: datetime | None = None
+) -> list[Email]:
     """The user's emails newer than `days` days, most recent first (optionally from one mailbox)."""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = (now or datetime.now(timezone.utc)) - timedelta(days=days)
     query = select(Email).where(Email.user_id == user_id, Email.date >= cutoff)
     if account_id is not None:
         query = query.where(Email.account_id == account_id)
@@ -145,7 +147,9 @@ def search_inbox(
         )
 
     total = db.scalar(select(func.count()).select_from(Email).where(*conditions)) or 0
-    rows = db.scalars(select(Email).where(*conditions).order_by(Email.date.desc()).limit(limit).offset(offset))
+    rows = db.scalars(
+        select(Email).where(*conditions).order_by(Email.date.desc()).limit(limit).offset(offset)
+    )
     return list(rows), total
 
 
@@ -220,7 +224,9 @@ EMBED_MAX_AGE_DAYS = 400
 def list_pending_embeddings(db: Session, account_id: int, limit: int) -> list[Email]:
     """Newest emails of a mailbox that do not have a vector yet."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=EMBED_MAX_AGE_DAYS)
-    query = select(Email).where(Email.account_id == account_id, Email.embedding.is_(None), Email.date >= cutoff)
+    query = select(Email).where(
+        Email.account_id == account_id, Email.embedding.is_(None), Email.date >= cutoff
+    )
     return list(db.scalars(query.order_by(Email.date.desc()).limit(limit)))
 
 
@@ -253,5 +259,7 @@ def search_candidates(
         conditions.append(Email.date < date_to)
     if sender:
         like = _like(sender.lower())
-        conditions.append(or_(Email.sender_address.like(like, escape=chr(92)), Email.sender.ilike(like, escape=chr(92))))
+        conditions.append(
+            or_(Email.sender_address.like(like, escape=chr(92)), Email.sender.ilike(like, escape=chr(92)))
+        )
     return list(db.scalars(select(Email).where(*conditions).order_by(Email.date.desc()).limit(limit)))

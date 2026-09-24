@@ -9,7 +9,9 @@ def thread_key(account_id: int, thread_id: str) -> str:
 
 
 def get(db: Session, user_id: int, key: str) -> ThreadSummary | None:
-    return db.scalar(select(ThreadSummary).where(ThreadSummary.user_id == user_id, ThreadSummary.thread_key == key))
+    return db.scalar(
+        select(ThreadSummary).where(ThreadSummary.user_id == user_id, ThreadSummary.thread_key == key)
+    )
 
 
 def save(db: Session, user_id: int, key: str, message_count: int, summary: str) -> ThreadSummary:

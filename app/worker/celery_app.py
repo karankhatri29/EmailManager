@@ -11,4 +11,8 @@ celery_app.conf.beat_schedule = {
         "task": "app.worker.tasks.sync_inbox",
         "schedule": settings.sync_interval_seconds,
     },
+    "run-jobs": {
+        "task": "app.worker.tasks.run_jobs",
+        "schedule": settings.jobs_interval_seconds,
+    },
 }

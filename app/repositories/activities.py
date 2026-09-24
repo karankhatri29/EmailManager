@@ -78,10 +78,12 @@ def delete_open_for_emails(db: Session, email_ids: list[str]) -> int:
     if not email_ids:
         return 0
     result = db.execute(
-        sql_delete(Activity).where(Activity.email_id.in_(email_ids), Activity.status != "done", Activity.source == "email")
+        sql_delete(Activity).where(
+            Activity.email_id.in_(email_ids), Activity.status != "done", Activity.source == "email"
+        )
     )
     db.commit()
-    return result.rowcount or 0
+    return getattr(result, "rowcount", 0) or 0
 
 
 def set_status_for_email(db: Session, email_id: str, status: str) -> None:
