@@ -41,7 +41,8 @@
             <h2>The short version</h2>
             <ul>
                 <li>The app has <b>read-only</b> access. It cannot send, delete, move or change your email.</li>
-                <li>Yes, <b>it stores the text of your emails</b> in its database so the dashboard is fast. That text is <b>not encrypted</b> inside the database.</li>
+                <li>Yes, <b>it stores the text of your emails</b> in its database so the dashboard is fast. The subject, message text and AI summary are <b>encrypted</b> there, so a copy of the database or a backup is unreadable without the app's key.</li>
+                <li>But the running app holds that key, so <b>whoever runs the server can still read your mail</b>. The sender's address, dates, priority and short task titles are not encrypted.</li>
                 <li>Emails ranked urgent or important are sent to <b>Google's Gemini AI</b> to write the summary, if the person running the app has set that up.</li>
                 <li>Disconnecting a mailbox <b>deletes its stored mail</b>. There are no ads, no trackers and nothing is sold.</li>
             </ul>
@@ -59,6 +60,7 @@
             <h2>What is stored</h2>
             <ul>
                 <li><b>For each email:</b> sender, subject, the message text (the first 4,000 characters; up to 20,000 for ticket and booking mails), the date, the priority the app gave it, and the AI summary if one was made.</li>
+                <li><b>Encrypted in the database:</b> the subject, the message text, the AI summary and the notes on calendar items. <b>Readable in the database:</b> the sender address, the date, the priority, the short task title (the first words of a subject) and calendar item titles, because the app needs to sort and group by them.</li>
                 <li><b>Derived from your mail:</b> tasks and deadlines, and the trips and tickets shown on the Trips tab (flights, trains, movies and so on).</li>
                 <li><b>Your account:</b> your email address, a <b>hashed</b> password (never the password itself), the mailboxes you connected, and the calendar items you or the app created.</li>
                 <li><b>Your access tokens</b> for Gmail / Outlook are stored <b>encrypted</b>.</li>
@@ -69,7 +71,8 @@
         <section class="glass-card p-5 sm:p-6 note">
             <h2>Where it is stored, and who can see it</h2>
             <ul>
-                <li>In the app's database on the server where it runs (a local file, or a PostgreSQL database). Email text is <b>readable there</b>, so anyone who runs the server or can open the database or its backups can read it. Only the access tokens are encrypted.</li>
+                <li>In the app's database on the server where it runs (a local file, or a PostgreSQL database). The subject, text and summary of each email, and your access tokens, are encrypted with the server's encryption key (Fernet: AES-128 with an integrity check). That protects database files, dumps and backups.</li>
+                <li>It does <b>not</b> protect against someone who can run or log in to the live server: the app decrypts mail to show it to you, so the key is there too. Because stored text is encrypted, even the leftover bytes a database keeps after something is deleted are unreadable. Mail stored before encryption was switched on stays readable until the operator converts it (which also compacts the database) and deletes old backups. If the key is lost, stored mail cannot be read again (syncing fetches it afresh, but mailboxes must be reconnected).</li>
                 <li><b>Google Gemini:</b> the text of urgent and important emails (up to 4,000 characters each) is sent to Google's Gemini API to create summaries. If no Gemini key is configured, nothing is sent. How Google handles that data depends on the API plan the operator uses, so check Google's terms if that matters to you.</li>
                 <li><b>Gmail and Microsoft</b> see the app connecting to your account, as they do for any app you authorise.</li>
                 <li>Your browser loads fonts from Google Fonts and styling from the Tailwind CDN. Those services can see your IP address and browser type, but never your email.</li>

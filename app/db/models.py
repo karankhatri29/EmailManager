@@ -4,6 +4,7 @@ from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text, Uniqu
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
+from .encrypted import EncryptedText
 
 
 def _now() -> datetime:
@@ -45,13 +46,15 @@ class Email(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     account_id: Mapped[int] = mapped_column(ForeignKey("mail_accounts.id", ondelete="CASCADE"), index=True)
     sender: Mapped[str] = mapped_column(String(512))
-    subject: Mapped[str] = mapped_column(Text)
-    body: Mapped[str] = mapped_column(Text)
+    subject: Mapped[str] = mapped_column(EncryptedText)  # encrypted at rest (see db/encrypted.py)
+    body: Mapped[str] = mapped_column(EncryptedText)  # encrypted at rest
     score: Mapped[float] = mapped_column(Float)
     category: Mapped[str] = mapped_column(String(64), index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
-    task: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    summary: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)  # encrypted at rest
+    task: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )  # first words of the subject: NOT encrypted
 
 
 class SyncState(Base):
@@ -77,7 +80,7 @@ class Activity(Base):
         ForeignKey("emails.id", ondelete="SET NULL"), nullable=True, unique=True
     )
     title: Mapped[str] = mapped_column(String(255))
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)  # encrypted at rest
     start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     all_day: Mapped[bool] = mapped_column(Boolean, default=False)

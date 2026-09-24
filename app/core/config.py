@@ -34,7 +34,11 @@ class Settings(BaseSettings):
 
     # Security. Generate both with: python -m scripts.generate_keys
     secret_key: str = ""  # signs session cookies
-    encryption_key: str = ""  # Fernet key; encrypts stored mailbox credentials
+    encryption_key: str = ""  # Fernet key; encrypts stored mailbox credentials and stored email text
+    # Old keys, comma separated, that stored data may still be encrypted with (key rotation): they can only
+    # decrypt. Run `python -m scripts.encrypt_stored_mail` to re-encrypt everything with the current key.
+    encryption_keys_previous: str = ""
+    encrypt_email_text: bool = True  # encrypt email subject / body / summary and calendar notes at rest
     session_https_only: bool = False  # set true behind HTTPS in production
     public_base_url: str = "http://localhost:8000"  # used to build calendar feed links
 

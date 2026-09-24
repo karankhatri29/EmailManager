@@ -9,6 +9,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from .api import accounts, activities, auth, bookings, calendar, inbox, routes
 from .core.config import get_settings
 from .core.logging import configure_logging
+from .db.encrypted import warn_if_plaintext
+from .db.session import engine
 from .services.background import start_periodic_sync
 
 APP_DIR = Path(__file__).resolve().parent
@@ -18,6 +20,7 @@ SESSION_MAX_AGE = 14 * 24 * 3600
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    warn_if_plaintext(engine)
     stop = start_periodic_sync(settings.sync_interval_seconds) if settings.inprocess_sync else None
     yield
     if stop is not None:

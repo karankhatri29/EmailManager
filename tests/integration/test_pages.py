@@ -115,7 +115,9 @@ def test_privacy_note_is_public_and_says_the_uncomfortable_things_plainly(client
     for statement in (
         "read-only",
         "stores the text of your emails",
-        "not encrypted",
+        "are encrypted",
+        "whoever runs the server can still read your mail",
+        "the sender's address, dates, priority and short task titles are not encrypted",
         "gemini",
         "disconnecting a mailbox",
         "attachments",
