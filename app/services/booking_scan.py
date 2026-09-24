@@ -93,7 +93,9 @@ def is_stale(db, account_id: int) -> bool:
 class BookingScanner:
     """One scan per mailbox at a time, a couple of mailboxes in parallel."""
 
-    def __init__(self, max_workers: int = 2) -> None:
+    def __init__(self, max_workers: int = 2, inline: bool = False) -> None:
+        """`inline=True` runs each scan in the calling thread (deterministic tests; never used in production)."""
+        self._inline = inline
         self._lock = threading.Lock()
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="booking-scan")
         self._running: set[int] = set()
@@ -106,8 +108,11 @@ class BookingScanner:
                 return False
             self._running.add(account_id)
             self._errors.pop(account_id, None)
-            self._futures = [f for f in self._futures if not f.done()]
-            self._futures.append(self._pool.submit(self._run, account_id))
+            if not self._inline:
+                self._futures = [f for f in self._futures if not f.done()]
+                self._futures.append(self._pool.submit(self._run, account_id))
+        if self._inline:
+            self._run(account_id)
         return True
 
     def _run(self, account_id: int) -> None:

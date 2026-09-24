@@ -104,3 +104,41 @@ def test_trips_view_and_navigation_exist_on_every_screen_size(client):
         assert element in html, element
     assert html.count('data-nav="trips"') == 2  # phone bottom bar + tablet rail
     assert client.get("/static/js/trips.js").status_code == 200
+
+
+def test_privacy_note_is_public_and_says_the_uncomfortable_things_plainly(client):
+    r = client.get(
+        "/privacy"
+    )  # no login: it must be reachable from the sign-in screen and the OAuth consent screen
+    assert r.status_code == 200
+    text = r.text.lower()
+    for statement in (
+        "read-only",
+        "stores the text of your emails",
+        "not encrypted",
+        "gemini",
+        "disconnecting a mailbox",
+        "attachments",
+    ):
+        assert statement in text, statement
+
+
+def test_privacy_is_linked_from_sign_in_and_settings(client):
+    html = client.get("/").text
+    assert html.count('href="/privacy"') == 2  # sign-in screen + Settings
+    assert 'id="privacyNote"' in html
+
+
+def test_settings_is_tabbed_and_dashboard_options_are_toggle_switches(client):
+    html = client.get("/").text
+    for tab in ("appearance", "dashboard", "inbox", "privacy"):
+        assert f'data-settings-tab="{tab}"' in html and f'data-settings-panel="{tab}"' in html, tab
+    assert (
+        'role="tablist"' in html and 'data-pref="timeframe"' in html
+    )  # timeframe is a segmented control now
+    assert 'id="prefTimeframe"' not in html
+    # the option rows are built in JS: each one is a switch (a styled checkbox with role="switch"), not a bare checkbox
+    js = client.get("/static/js/settings.js").text
+    assert 'role="switch"' in js and "switch-track" in js and "pref-row" not in js
+    css = client.get("/static/css/theme.css").text
+    assert ".switch-thumb" in css and ".theme-tile" in css

@@ -40,9 +40,8 @@ function show(settings) {
 export async function loadAccountSettings() {
     try {
         show(await api('/api/settings'));
-        $('accountSettings').classList.remove('hidden');
     } catch {
-        $('accountSettings').classList.add('hidden'); // signed out
+        // signed out: the dialog is not reachable anyway
     }
 }
 

@@ -76,6 +76,9 @@
         border-radius: 9999px; background: rgb(var(--slate-600));
     }
     @keyframes ep-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+    /* Settings is a tall sheet made of header / tabs / scrolling body / footer, so its handle sits on top. */
+    #settingsModal > * { padding: 0; height: min(90dvh, 44rem); }
+    #settingsModal > *::before { margin: 0.7rem auto 0; flex-shrink: 0; }
 
     /* The top bar is just a title and two buttons; the tabs live in the bottom bar. */
     #hero h2 { font-size: 1.6rem; }

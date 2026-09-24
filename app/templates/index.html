@@ -92,6 +92,7 @@
                 <span id="authSwitchText">Don't have an account?</span>
                 <button id="authSwitch" type="button" class="text-blue-400 hover:text-blue-300 font-semibold underline cursor-pointer">Create one</button>
             </p>
+            <p class="text-xs text-slate-500 mt-4 text-center">Read-only access to your mail. <a href="/privacy" class="underline hover:text-fg" id="authPrivacy">How your data is handled</a></p>
         </div>
     </section>
 
@@ -447,112 +448,161 @@
 
     <!-- Settings -->
     <div id="settingsModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-        <div class="glass-card modal-card w-full max-w-lg max-h-[92dvh] overflow-y-auto p-5 sm:p-6 space-y-6">
-            <div class="flex items-start justify-between gap-3">
+        <div class="glass-card modal-card settings-card w-full max-w-2xl flex flex-col overflow-hidden">
+
+            <header class="flex items-start justify-between gap-3 px-5 sm:px-6 pt-5 sm:pt-6 shrink-0">
                 <div>
-                    <h2 id="settingsTitle" class="text-xl font-extrabold tracking-tight text-fg">Settings </h2>
+                    <h2 id="settingsTitle" class="text-xl font-extrabold tracking-tight text-fg">Settings</h2>
                     <p class="text-xs text-slate-400 mt-1">Saved on this device. Make it yours.</p>
                 </div>
-                <button id="settingsClose" class="icon-btn -mt-1 -mr-2" aria-label="Close settings">×</button>
+                <button id="settingsClose" class="icon-btn -mt-1 -mr-2" aria-label="Close settings">&#10005;</button>
+            </header>
+
+            <div class="px-5 sm:px-6 pt-4 shrink-0">
+                <div class="stabs" role="tablist" aria-label="Settings sections">
+                    <button type="button" role="tab" id="stab-appearance" data-settings-tab="appearance" aria-selected="true" aria-controls="spanel-appearance">Appearance</button>
+                    <button type="button" role="tab" id="stab-dashboard" data-settings-tab="dashboard" aria-selected="false" aria-controls="spanel-dashboard" tabindex="-1">Dashboard</button>
+                    <button type="button" role="tab" id="stab-inbox" data-settings-tab="inbox" aria-selected="false" aria-controls="spanel-inbox" tabindex="-1">Inbox</button>
+                    <button type="button" role="tab" id="stab-account" data-settings-tab="account" aria-selected="false" aria-controls="spanel-account" tabindex="-1">Account</button>
+                    <button type="button" role="tab" id="stab-privacy" data-settings-tab="privacy" aria-selected="false" aria-controls="spanel-privacy" tabindex="-1">Privacy</button>
+                </div>
             </div>
 
-            <section class="space-y-3">
-                <h3 class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Appearance</h3>
+            <div id="settingsBody" class="flex-1 min-h-0 overflow-y-auto px-5 sm:px-6 py-5">
 
-                <div class="space-y-2">
-                    <p class="text-sm font-semibold text-fg">Theme</p>
-                    <div class="seg" role="group" aria-label="Theme">
-                        <button type="button" data-pref="theme" data-value="system" aria-pressed="false">System</button>
-                        <button type="button" data-pref="theme" data-value="light" aria-pressed="false">Light</button>
-                        <button type="button" data-pref="theme" data-value="dark" aria-pressed="false">Dark</button>
+                <!-- Appearance -->
+                <section id="spanel-appearance" role="tabpanel" aria-labelledby="stab-appearance" data-settings-panel="appearance" class="space-y-6">
+                    <div>
+                        <h3 class="setting-h">Theme</h3>
+                        <div class="grid grid-cols-3 gap-2.5" role="group" aria-label="Theme">
+                            <button type="button" class="theme-tile" data-pref="theme" data-value="system" aria-pressed="false">
+                                <span class="theme-prev prev-system" aria-hidden="true"><i></i></span>
+                                <span class="theme-name">System</span>
+                            </button>
+                            <button type="button" class="theme-tile" data-pref="theme" data-value="light" aria-pressed="false">
+                                <span class="theme-prev prev-light" aria-hidden="true"><i></i></span>
+                                <span class="theme-name">Light</span>
+                            </button>
+                            <button type="button" class="theme-tile" data-pref="theme" data-value="dark" aria-pressed="false">
+                                <span class="theme-prev prev-dark" aria-hidden="true"><i></i></span>
+                                <span class="theme-name">Dark</span>
+                            </button>
+                        </div>
+                        <p id="themeHint" class="text-xs text-slate-400 mt-2.5"></p>
                     </div>
-                    <p id="themeHint" class="text-xs text-slate-400"></p>
-                </div>
 
-                <div class="space-y-2">
-                    <p class="text-sm font-semibold text-fg">Accent colour</p>
-                    <div class="flex items-center gap-2.5" role="group" aria-label="Accent colour">
-                        <button type="button" class="swatch" style="--sw: 262" data-pref="accent" data-value="violet" aria-pressed="false" aria-label="Violet"></button>
-                        <button type="button" class="swatch" style="--sw: 330" data-pref="accent" data-value="pink" aria-pressed="false" aria-label="Pink"></button>
-                        <button type="button" class="swatch" style="--sw: 217" data-pref="accent" data-value="blue" aria-pressed="false" aria-label="Blue"></button>
-                        <button type="button" class="swatch" style="--sw: 160" data-pref="accent" data-value="mint" aria-pressed="false" aria-label="Mint"></button>
-                        <button type="button" class="swatch" style="--sw: 24" data-pref="accent" data-value="sunset" aria-pressed="false" aria-label="Sunset"></button>
+                    <div>
+                        <h3 class="setting-h">Accent colour</h3>
+                        <div class="flex flex-wrap gap-2" role="group" aria-label="Accent colour">
+                            <button type="button" class="swatch-btn" style="--sw: 262" data-pref="accent" data-value="violet" aria-pressed="false"><span class="swatch"></span><span>Violet</span></button>
+                            <button type="button" class="swatch-btn" style="--sw: 330" data-pref="accent" data-value="pink" aria-pressed="false"><span class="swatch"></span><span>Pink</span></button>
+                            <button type="button" class="swatch-btn" style="--sw: 217" data-pref="accent" data-value="blue" aria-pressed="false"><span class="swatch"></span><span>Blue</span></button>
+                            <button type="button" class="swatch-btn" style="--sw: 160" data-pref="accent" data-value="mint" aria-pressed="false"><span class="swatch"></span><span>Mint</span></button>
+                            <button type="button" class="swatch-btn" style="--sw: 24" data-pref="accent" data-value="sunset" aria-pressed="false"><span class="swatch"></span><span>Sunset</span></button>
+                        </div>
                     </div>
-                </div>
 
-                <div class="space-y-2">
-                    <p class="text-sm font-semibold text-fg">Text size</p>
-                    <div class="seg" role="group" aria-label="Text size">
-                        <button type="button" data-pref="density" data-value="compact" aria-pressed="false">Compact</button>
-                        <button type="button" data-pref="density" data-value="comfortable" aria-pressed="false">Comfy</button>
-                        <button type="button" data-pref="density" data-value="roomy" aria-pressed="false">Roomy</button>
+                    <div class="grid sm:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="setting-h">Text size</h3>
+                            <div class="seg" role="group" aria-label="Text size">
+                                <button type="button" data-pref="density" data-value="compact" aria-pressed="false"><span class="text-[0.7rem]">Aa</span> Compact</button>
+                                <button type="button" data-pref="density" data-value="comfortable" aria-pressed="false"><span class="text-sm">Aa</span> Comfy</button>
+                                <button type="button" data-pref="density" data-value="roomy" aria-pressed="false"><span class="text-base">Aa</span> Roomy</button>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="setting-h">Animations</h3>
+                            <div class="seg" role="group" aria-label="Animations">
+                                <button type="button" data-pref="motion" data-value="auto" aria-pressed="false">Auto</button>
+                                <button type="button" data-pref="motion" data-value="full" aria-pressed="false">Full</button>
+                                <button type="button" data-pref="motion" data-value="reduced" aria-pressed="false">Reduced</button>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-2">Auto follows your device's "reduce motion" setting.</p>
+                        </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="space-y-2">
-                    <p class="text-sm font-semibold text-fg">Animations</p>
-                    <div class="seg" role="group" aria-label="Animations">
-                        <button type="button" data-pref="motion" data-value="auto" aria-pressed="false">Auto</button>
-                        <button type="button" data-pref="motion" data-value="full" aria-pressed="false">Full</button>
-                        <button type="button" data-pref="motion" data-value="reduced" aria-pressed="false">Reduced</button>
+                <!-- Dashboard -->
+                <section id="spanel-dashboard" role="tabpanel" aria-labelledby="stab-dashboard" data-settings-panel="dashboard" hidden class="space-y-5">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <p id="dashSummary" class="text-sm font-bold text-fg"></p>
+                            <p id="kpiCount" class="text-xs text-slate-400 mt-0.5"></p>
+                        </div>
+                        <button type="button" id="dashReset" class="tbtn">Use recommended</button>
                     </div>
-                    <p class="text-xs text-slate-400">Auto follows your device's "reduce motion" setting.</p>
-                </div>
-            </section>
+                    <div id="dashPrefs" class="space-y-5"></div>
+                </section>
 
-            <section class="space-y-3">
-                <h3 class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Dashboard</h3>
-                <p class="text-xs text-slate-400">Choose what your home screen shows. <span id="kpiCount"></span></p>
-                <div id="dashPrefs" class="space-y-4"></div>
-            </section>
+                <!-- Inbox -->
+                <section id="spanel-inbox" role="tabpanel" aria-labelledby="stab-inbox" data-settings-panel="inbox" hidden class="space-y-6">
+                    <div>
+                        <h3 class="setting-h">Default timeframe</h3>
+                        <div class="seg" role="group" aria-label="Default timeframe">
+                            <button type="button" data-pref="timeframe" data-value="Last 1 Day" aria-pressed="false">24 hours</button>
+                            <button type="button" data-pref="timeframe" data-value="Last 1 Week" aria-pressed="false">7 days</button>
+                            <button type="button" data-pref="timeframe" data-value="Last 1 Month" aria-pressed="false">30 days</button>
+                            <button type="button" data-pref="timeframe" data-value="Last 3 Months" aria-pressed="false">3 months</button>
+                            <button type="button" data-pref="timeframe" data-value="Last 1 Year" aria-pressed="false">1 year</button>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-2">How far back the dashboard looks when you open the app. You can still change it any time from the home screen.</p>
+                    </div>
+                </section>
 
-            <section id="accountSettings" class="space-y-3 hidden">
-                <h3 class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Account: alerts and automation</h3>
-                <p class="text-xs text-slate-400">Saved to your account, because they run while you are away. <span id="setStatus" class="text-emerald-400" aria-live="polite"></span></p>
-                <p id="setEmailNote" class="hidden text-xs text-amber-400">This server cannot send email yet, so email options only show in the app.</p>
+                <!-- Account: server-side settings (loaded by js/accountsettings.js) -->
+                <section id="spanel-account" role="tabpanel" aria-labelledby="stab-account" data-settings-panel="account" hidden class="space-y-5">
+                    <p class="text-xs text-slate-400">Saved to your account, because they run while you are away. <span id="setStatus" class="text-emerald-400" aria-live="polite"></span></p>
+                    <p id="setEmailNote" class="hidden text-xs text-amber-400">This server cannot send email yet, so email options only show in the app.</p>
 
-                <div class="space-y-1.5">
-                    <label for="setTz" class="text-sm font-semibold text-fg">Time zone</label>
-                    <div class="flex gap-2"><input id="setTz" list="tzList" class="field" autocomplete="off"><button id="setTzDetect" type="button" class="icon-btn !w-auto px-3 text-xs font-semibold shrink-0">Detect</button></div>
-                    <datalist id="tzList"></datalist>
-                    <p class="text-xs text-slate-400">Decides when "today" starts and how dates like 03/04 are read.</p>
-                </div>
+                    <div>
+                        <h3 class="setting-h">Time zone</h3>
+                        <div class="flex gap-2"><input id="setTz" list="tzList" class="field" autocomplete="off" aria-label="Time zone"><button id="setTzDetect" type="button" class="icon-btn !w-auto px-3 text-xs font-semibold shrink-0">Detect</button></div>
+                        <datalist id="tzList"></datalist>
+                        <p class="text-xs text-slate-400 mt-2">Decides when "today" starts and how dates like 03/04 are read.</p>
+                    </div>
 
-                <div class="flex items-center justify-between gap-3"><label for="setBriefing" class="text-sm text-fg cursor-pointer">Morning briefing</label>
-                    <span class="flex items-center gap-2"><select id="setBriefingHour" class="field !w-auto !py-1.5" aria-label="Briefing time"></select><input id="setBriefing" type="checkbox" class="w-4 h-4 accent-[hsl(var(--brand-h)_92%_60%)]"></span></div>
-                <div class="flex items-center justify-between gap-3"><label for="setDigest" class="text-sm text-fg cursor-pointer">Evening promotions digest</label>
-                    <span class="flex items-center gap-2"><select id="setDigestHour" class="field !w-auto !py-1.5" aria-label="Digest time"></select><input id="setDigest" type="checkbox" class="w-4 h-4 accent-[hsl(var(--brand-h)_92%_60%)]"></span></div>
-                <div class="flex items-center justify-between gap-3"><label for="setAlerts" class="text-sm text-fg cursor-pointer">Alert me about urgent mail</label>
-                    <input id="setAlerts" type="checkbox" class="w-4 h-4 accent-[hsl(var(--brand-h)_92%_60%)]"></div>
-                <div class="flex items-center justify-between gap-3"><label for="setReminders" class="text-sm text-fg cursor-pointer">Also email me task reminders</label>
-                    <input id="setReminders" type="checkbox" class="w-4 h-4 accent-[hsl(var(--brand-h)_92%_60%)]"></div>
-                <div class="flex items-center justify-between gap-3"><label for="setFollowup" class="text-sm text-fg">Nudge me when nobody replies after</label>
-                    <span class="flex items-center gap-2"><input id="setFollowup" type="number" min="1" max="30" class="field !w-20 !py-1.5"><span class="text-sm text-slate-400">days</span></span></div>
-                <div class="flex items-center justify-between gap-3"><label for="setCleanup" class="text-sm text-fg cursor-pointer">Automatically unsubscribe from newsletters I never open</label>
-                    <input id="setCleanup" type="checkbox" class="w-4 h-4 accent-[hsl(var(--brand-h)_92%_60%)]"></div>
-                <div class="flex items-center justify-between gap-3"><label for="setCleanupMonths" class="text-sm text-fg">"Never open" means unread for</label>
-                    <select id="setCleanupMonths" class="field !w-auto !py-1.5"><option value="1">1 month</option><option value="3">3 months</option><option value="6">6 months</option><option value="12">12 months</option></select></div>
-                <p class="text-xs text-slate-400">Cleaning up unsubscribes only when the sender supports one-click, then mutes and archives the sender here. Nothing is changed in your mailbox itself, and every step can be undone under Inbox tools, Rules.</p>
-            </section>
+                    <div>
+                        <h3 class="setting-h">Summaries and alerts</h3>
+                        <div class="group-card">
+                        <label class="toggle-row"><span class="min-w-0"><span class="toggle-title">Morning briefing</span><span class="toggle-hint">One message with your day: tasks, classes and mail that needs you.</span></span><span class="switch"><input type="checkbox" id="setBriefing" role="switch"><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span></span></label>
+                            <div class="toggle-row"><span class="toggle-title">Briefing time</span><select id="setBriefingHour" class="field !w-auto !py-1.5" aria-label="Briefing time"></select></div>
+                        <label class="toggle-row"><span class="min-w-0"><span class="toggle-title">Evening promotions digest</span><span class="toggle-hint">How many promotional emails came today and the best deals, in one message.</span></span><span class="switch"><input type="checkbox" id="setDigest" role="switch"><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span></span></label>
+                            <div class="toggle-row"><span class="toggle-title">Digest time</span><select id="setDigestHour" class="field !w-auto !py-1.5" aria-label="Digest time"></select></div>
+                        <label class="toggle-row"><span class="min-w-0"><span class="toggle-title">Alert me about urgent mail</span><span class="toggle-hint">Shows up in the bell.</span></span><span class="switch"><input type="checkbox" id="setAlerts" role="switch"><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span></span></label>
+                        <label class="toggle-row"><span class="min-w-0"><span class="toggle-title">Email me task reminders</span><span class="toggle-hint">Needs email to be set up on this server.</span></span><span class="switch"><input type="checkbox" id="setReminders" role="switch"><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span></span></label>
+                            <div class="toggle-row"><span class="toggle-title">Nudge me when nobody replies after</span><span class="flex items-center gap-2"><input id="setFollowup" type="number" min="1" max="30" class="field !w-20 !py-1.5" aria-label="Days"><span class="text-sm text-slate-400">days</span></span></div>
+                        </div>
+                    </div>
 
-            <section class="space-y-3">
-                <h3 class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Inbox</h3>
-                <div class="space-y-2">
-                    <label for="prefTimeframe" class="text-sm font-semibold text-fg">Default timeframe</label>
-                    <select id="prefTimeframe" class="field cursor-pointer">
-                        <option value="Last 1 Day">Last 24 hours</option>
-                        <option value="Last 1 Week">Last 7 days</option>
-                        <option value="Last 1 Month">Last 30 days</option>
-                        <option value="Last 3 Months">Last 3 months</option>
-                        <option value="Last 1 Year">Last year</option>
-                    </select>
-                </div>
-            </section>
+                    <div>
+                        <h3 class="setting-h">Newsletter clean-up</h3>
+                        <div class="group-card">
+                        <label class="toggle-row"><span class="min-w-0"><span class="toggle-title">Unsubscribe from newsletters I never open</span><span class="toggle-hint">Runs once a day and tells you what it did.</span></span><span class="switch"><input type="checkbox" id="setCleanup" role="switch"><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span></span></label>
+                            <div class="toggle-row"><span class="toggle-title">"Never open" means unread for</span><select id="setCleanupMonths" class="field !w-auto !py-1.5" aria-label="Months"><option value="1">1 month</option><option value="3">3 months</option><option value="6">6 months</option><option value="12">12 months</option></select></div>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-2">It unsubscribes only when the sender supports one-click, then mutes and archives the sender here. Nothing is changed in your mailbox itself, and each step can be undone under Inbox tools, Rules.</p>
+                    </div>
+                </section>
 
-            <div class="flex items-center gap-2 pt-1">
-                <button id="settingsReset" type="button" class="text-xs font-semibold text-slate-400 hover:text-fg cursor-pointer">Reset to defaults</button>
+                <!-- Privacy -->
+                <section id="spanel-privacy" role="tabpanel" aria-labelledby="stab-privacy" data-settings-panel="privacy" hidden>
+                    <div id="privacyNote" class="space-y-3">
+                        <ul class="group-card">
+                            <li class="info-row"><b>Read-only.</b><span>The app cannot send, delete or change your email.</span></li>
+                            <li class="info-row"><b>Email text is stored</b><span>in this app's database (not encrypted there) so the dashboard is fast. Attachments and images are not stored.</span></li>
+                            <li class="info-row"><b>AI summaries</b><span>Urgent and important emails are sent to Google Gemini, if the operator set it up.</span></li>
+                            <li class="info-row"><b>Deleting mail</b><span>Disconnect a mailbox (the &times; next to it in the menu) to delete its stored mail.</span></li>
+                        </ul>
+                        <a href="/privacy" target="_blank" rel="noopener" class="inline-block text-xs font-bold text-blue-400 hover:text-blue-300 underline">Read the full privacy note</a>
+                    </div>
+                </section>
+            </div>
+
+            <footer class="flex items-center gap-2 px-5 sm:px-6 py-4 border-t border-slate-700/40 shrink-0">
+                <button id="settingsReset" type="button" class="text-xs font-semibold text-slate-400 hover:text-fg cursor-pointer">Reset everything</button>
                 <button id="settingsDone" type="button" class="ml-auto bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-6 py-2.5 rounded-lg cursor-pointer">Done</button>
-            </div>
+            </footer>
         </div>
     </div>
 

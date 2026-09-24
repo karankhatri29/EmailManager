@@ -123,14 +123,32 @@ function setDashItem(kind, id, on) {
     document.dispatchEvent(new CustomEvent('dashchange'));
 }
 
+// One row per option: the name and what it does on the left, an on/off switch on the right.
+function toggleRow(kind, item, on) {
+    return `
+        <label class="toggle-row">
+            <span class="min-w-0">
+                <span class="toggle-title">${item.label}</span>
+                <span class="toggle-hint">${item.hint}</span>
+            </span>
+            <span class="switch">
+                <input type="checkbox" role="switch" data-dash="${kind}" data-id="${item.id}" ${on ? 'checked' : ''}>
+                <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+            </span>
+        </label>`;
+}
+
 function dashGroup(title, kind, catalog, selected) {
-    const rows = catalog.map((item) => `
-        <label class="pref-row">
-            <input type="checkbox" data-dash="${kind}" data-id="${item.id}" ${selected.includes(item.id) ? 'checked' : ''}>
-            <span><span class="block text-sm font-semibold text-fg">${item.label}</span>
-            <span class="block text-xs text-slate-400">${item.hint}</span></span>
-        </label>`).join('');
-    return `<div><p class="text-sm font-bold text-fg mb-1">${title}</p>${rows}</div>`;
+    const rows = catalog.map((item) => toggleRow(kind, item, selected.includes(item.id))).join('');
+    return `<div><h3 class="setting-h">${title}</h3><div class="group-card">${rows}</div></div>`;
+}
+
+function resetDash() {
+    prefs.kpis = defaultIds(KPI_CATALOG);
+    prefs.widgets = defaultIds(WIDGET_CATALOG);
+    save();
+    syncDashPrefs();
+    document.dispatchEvent(new CustomEvent('dashchange'));
 }
 
 function buildDashPrefs() {
@@ -146,10 +164,15 @@ function syncDashPrefs() {
         const list = box.dataset.dash === 'kpi' ? prefs.kpis : prefs.widgets;
         box.checked = list.includes(box.dataset.id);
     });
+    const n = prefs.kpis.length;
+    const summary = $('dashSummary');
+    if (summary) summary.textContent = `${n} of ${KPI_CATALOG.length} numbers, ${prefs.widgets.length} of ${WIDGET_CATALOG.length} widgets`;
     const note = $('kpiCount');
     if (note) {
-        const n = prefs.kpis.length;
-        note.textContent = n > 9 ? `${n} numbers is a lot. 5 to 9 is easiest to take in at a glance.` : `${n} key number${n === 1 ? '' : 's'} shown.`;
+        note.textContent = n > 9
+            ? `${n} numbers is a lot. 5 to 9 is easiest to take in at a glance.`
+            : n < 5 ? 'Fewer than 5 numbers keeps things calm. 5 to 9 is the usual sweet spot.'
+                : 'Nice: 5 to 9 numbers is easiest to take in at a glance.';
     }
 }
 
@@ -159,8 +182,6 @@ function syncControls() {
     document.querySelectorAll('[data-pref]').forEach((button) => {
         button.setAttribute('aria-pressed', String(prefs[button.dataset.pref] === button.dataset.value));
     });
-    const select = $('prefTimeframe');
-    if (select) select.value = prefs.timeframe;
     const hint = $('themeHint');
     if (hint) {
         hint.textContent = prefs.theme === 'system'
@@ -169,8 +190,27 @@ function syncControls() {
     }
 }
 
+// --- tabs ------------------------------------------------------------------------------------------
+
+const TABS = ['appearance', 'dashboard', 'inbox', 'account', 'privacy'];
+let currentTab = 'appearance';
+
+function selectTab(name, { focus = false } = {}) {
+    currentTab = name;
+    document.querySelectorAll('[data-settings-tab]').forEach((tab) => {
+        const on = tab.dataset.settingsTab === name;
+        tab.setAttribute('aria-selected', String(on));
+        tab.tabIndex = on ? 0 : -1;
+        if (on && focus) tab.focus();
+    });
+    document.querySelectorAll('[data-settings-panel]').forEach((panel) => { panel.hidden = panel.dataset.settingsPanel !== name; });
+    const body = $('settingsBody');
+    if (body) body.scrollTop = 0;
+}
+
 function openSettings() {
     syncControls();
+    selectTab(currentTab);
     show($('settingsModal'), true);
     document.dispatchEvent(new CustomEvent('settingsopen')); // the account section loads its own values
     $('settingsClose').focus();
@@ -198,7 +238,21 @@ export function initSettings({ onTimeframeChange } = {}) {
     // The quick toggle flips between light and dark. "System" (follow the device) is set in Settings.
     $('themeToggle').addEventListener('click', () => setPref('theme', resolvedTheme() === 'dark' ? 'light' : 'dark'));
 
-    $('prefTimeframe').addEventListener('change', (event) => setPref('timeframe', event.target.value));
+    // Tabs: click, or the arrow keys once one has focus (the standard tablist pattern).
+    $('settingsModal').addEventListener('click', (event) => {
+        const tab = event.target.closest('[data-settings-tab]');
+        if (tab) selectTab(tab.dataset.settingsTab);
+        if (event.target.closest('#dashReset')) resetDash();
+    });
+    $('settingsModal').addEventListener('keydown', (event) => {
+        const tab = event.target.closest('[data-settings-tab]');
+        if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const i = TABS.indexOf(tab.dataset.settingsTab);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1
+            : (i + (event.key === 'ArrowRight' ? 1 : -1) + TABS.length) % TABS.length;
+        selectTab(TABS[next], { focus: true });
+    });
     $('settingsClose').addEventListener('click', closeSettings);
     $('settingsDone').addEventListener('click', closeSettings);
     $('settingsModal').addEventListener('click', (event) => { if (event.target === $('settingsModal')) closeSettings(); });
