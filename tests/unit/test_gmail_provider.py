@@ -35,7 +35,7 @@ def _http_error(status):
 def test_list_message_ids():
     svc = _service(messages=[{"id": "a"}, {"id": "b"}])
     assert list_message_ids(svc, "Last 1 Week") == ["a", "b"]
-    assert svc.users().messages().list.call_args.kwargs["q"] == "newer_than:7d"
+    assert svc.users().messages().list.call_args.kwargs["q"] == "newer_than:7d -in:sent -in:drafts"
 
 
 def test_list_message_ids_empty():

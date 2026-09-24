@@ -15,6 +15,7 @@ PAGE_SIZE = 100  # ids per list call (Gmail allows up to 500)
 BATCH_SIZE = 25  # messages per batched HTTP request
 MAX_BODY_CHARS = 4000
 SENT_THREAD_LIMIT = 40
+RECEIVED_ONLY = " -in:sent -in:drafts"  # the inbox view of mail: not your own sent mail or drafts
 
 
 # --- Gmail API helpers (operate on a googleapiclient service) -----------------------------------
@@ -65,7 +66,7 @@ def _header(headers, name):
 
 def list_message_ids(service, time_filter, limit=None):
     """Ids of the messages in the timeframe, newest first, following pagination up to `limit`."""
-    query = TIMEFRAMES.get(time_filter, ("", 0))[0]
+    query = TIMEFRAMES.get(time_filter, ("", 0))[0] + RECEIVED_ONLY
     limit = limit or TIMEFRAME_MESSAGE_LIMITS.get(time_filter, PAGE_SIZE)
 
     ids: list[str] = []

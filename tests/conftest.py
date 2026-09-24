@@ -89,6 +89,21 @@ def make_client(session_factory, manager):
 
 
 @pytest.fixture(autouse=True)
+def _no_real_ai():
+    """A test that forgets to mock the AI fails loudly instead of spending real API requests."""
+
+    def refuse(*args, **kwargs):
+        raise RuntimeError("real AI calls are disabled in tests; patch the function you need")
+
+    with (
+        patch("app.services.ai_summarizer._generate", refuse),
+        patch("app.services.ai_summarizer.generate_json", refuse),
+        patch("app.services.embeddings.embed_texts", refuse),
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _reset_login_limiter():
     login_limiter._failures.clear()
 

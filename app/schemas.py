@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
@@ -252,3 +252,45 @@ class ActivityUpdate(BaseModel):
 
 class CalendarFeedOut(BaseModel):
     url: str
+
+
+# --- smart search and threads ------------------------------------------------------------------
+
+
+class SearchPlanOut(BaseModel):
+    keywords: list[str]
+    date_from: date | None = None
+    date_to: date | None = None
+    category: str | None = None
+    sender: str | None = None
+    explanation: str  # e.g. "Looking for mail about couch, invoice between 2026-06-01 and 2026-08-31"
+    used_ai: bool
+
+
+class SearchHit(EmailListItem):
+    match: float  # relevance, higher is better
+
+
+class SearchResponse(BaseModel):
+    plan: SearchPlanOut
+    semantic: bool  # True when ranked by meaning as well as words
+    items: list[SearchHit]
+
+
+class ThreadMessage(BaseModel):
+    id: str
+    sender: str
+    date: datetime
+    snippet: str
+
+    @field_validator("date")
+    @classmethod
+    def _utc(cls, value):
+        return _as_utc(value)
+
+
+class ThreadOut(BaseModel):
+    message_count: int
+    messages: list[ThreadMessage]
+    summary: str | None = None  # HTML built server-side from escaped text
+    summary_current: bool = False  # False if the thread has grown since the summary was made

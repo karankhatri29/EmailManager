@@ -13,16 +13,22 @@ from ..db.session import get_db
 from ..repositories import accounts as accounts_repo
 from ..repositories import emails as emails_repo
 from ..repositories import rules as rules_repo
+from ..core.security import LoginRateLimiter
 from ..schemas import (
     EmailListItem,
     EmailOut,
     EmailUpdate,
     InboxPage,
     NewsletterOut,
+    SearchHit,
+    SearchPlanOut,
+    SearchResponse,
+    ThreadMessage,
+    ThreadOut,
     UnsubscribeRequest,
     UnsubscribeResult,
 )
-from ..services import email_actions
+from ..services import email_actions, search_service, threads
 from ..services.nlp_engine import PROMOTIONAL
 from ..services.rules import match, to_specs
 from ..services.unsubscribe import UnsafeUrl, one_click_unsubscribe
@@ -34,6 +40,17 @@ router = APIRouter(prefix="/api", tags=["mail"])
 
 Category = Literal["Urgent / Action Required", "Important", "General", "Promotional"]
 MAX_HISTORY_DAYS = max(days for _, days in TIMEFRAMES.values())
+
+# Smart search and thread summaries call the AI, so each user gets a modest budget per minute.
+# (Reuses the failure counter as a hit counter; in-memory, so per process.)
+ai_limiter = LoginRateLimiter(max_failures=30, window_seconds=60)
+
+
+def _spend_ai_budget(user: User) -> None:
+    key = f"ai:{user.id}"
+    if ai_limiter.is_blocked(key):
+        raise HTTPException(status_code=429, detail="Too many requests, please wait a moment.")
+    ai_limiter.record_failure(key)
 
 
 def to_list_item(email: Email) -> EmailListItem:
@@ -193,3 +210,74 @@ def _try_one_click(url: str) -> UnsubscribeResult:
         logger.warning("One-click unsubscribe request failed", exc_info=True)
         detail = "The sender could not be reached."
     return UnsubscribeResult(method="link", url=url, ok=True, detail=f"{detail} Open the link to finish unsubscribing.")
+
+
+# --- smart search --------------------------------------------------------------------------------
+
+
+@router.get("/search", response_model=SearchResponse)
+def smart_search(
+    q: str = Query(min_length=2, max_length=search_service.MAX_QUERY_CHARS),
+    account_id: int | None = None,
+    limit: int = Query(default=20, ge=1, le=50),
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Ask about your mail in plain words, e.g. the invoice for the blue couch I bought last summer."""
+    if account_id is not None and accounts_repo.get_for_user(db, user.id, account_id) is None:
+        raise HTTPException(status_code=404, detail="Mailbox not found")
+    _spend_ai_budget(user)
+
+    result = search_service.search(db, user.id, q, account_id=account_id, limit=limit)
+    plan = result.plan
+    return SearchResponse(
+        plan=SearchPlanOut(
+            keywords=plan.keywords,
+            date_from=plan.date_from,
+            date_to=plan.date_to,
+            category=plan.category,
+            sender=plan.sender,
+            explanation=plan.explain(),
+            used_ai=plan.used_ai,
+        ),
+        semantic=result.semantic,
+        items=[SearchHit(**to_list_item(e).model_dump(), match=score) for e, score in result.hits],
+    )
+
+
+# --- conversations -------------------------------------------------------------------------------
+
+
+def _thread_out(db: Session, user: User, email: Email) -> ThreadOut:
+    messages = threads.messages_for(db, user.id, email)
+    cached = threads.cached_summary(db, user.id, email)
+    return ThreadOut(
+        message_count=len(messages),
+        messages=[
+            ThreadMessage(id=m.id, sender=m.sender, date=m.date, snippet=" ".join(m.body.split())[:160])
+            for m in messages
+        ],
+        summary=cached.summary if cached else None,
+        summary_current=bool(cached and cached.message_count == len(messages)),
+    )
+
+
+@router.get("/emails/{email_id}/thread", response_model=ThreadOut)
+def get_thread(email_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """The stored messages of this email's conversation, plus its summary if one was made."""
+    return _thread_out(db, user, _own_email(db, user, email_id))
+
+
+@router.post("/emails/{email_id}/thread/summary", response_model=ThreadOut)
+def summarize_thread(email_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Summarises the whole conversation (decisions, open questions, next steps). Cached until it grows."""
+    email = _own_email(db, user, email_id)
+    _spend_ai_budget(user)
+    try:
+        threads.summarize(db, user.id, email)
+    except threads.NothingToSummarise:
+        raise HTTPException(status_code=400, detail="This conversation has only one message.") from None
+    except Exception:
+        logger.exception("Thread summary failed")
+        raise HTTPException(status_code=502, detail="Could not summarise the conversation right now.") from None
+    return _thread_out(db, user, email)

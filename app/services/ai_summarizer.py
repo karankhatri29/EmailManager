@@ -1,8 +1,10 @@
 import html
+import json
 import logging
 import re
 
 from google import genai
+from google.genai import types
 
 from ..core.config import get_settings
 
@@ -32,6 +34,47 @@ def _generate(prompt):
     client = genai.Client(api_key=settings.gemini_api_key or None)
     response = client.models.generate_content(model=settings.gemini_model, contents=prompt)
     return response.text
+
+
+def generate_json(prompt, schema):
+    """Asks the model for JSON matching a pydantic schema; returns a dict. Raises if the call fails."""
+    settings = get_settings()
+    client = genai.Client(api_key=settings.gemini_api_key or None)
+    response = client.models.generate_content(
+        model=settings.gemini_model,
+        contents=prompt,
+        config=types.GenerateContentConfig(response_mime_type="application/json", response_schema=schema),
+    )
+    return json.loads(response.text)
+
+
+def generate_text(prompt):
+    """Plain-text generation. Raises if the call fails."""
+    return (_generate(prompt) or "").strip()
+
+
+THREAD_PROMPT = """Summarise this email conversation for someone who has not read it. Be brief and concrete.
+Use exactly this Markdown layout, omit any section with nothing to say, and write no introduction:
+
+### 🧵 Conversation
+[1-2 sentences: what the thread is about]
+
+### ✅ Decisions
+- [each decision or agreement reached]
+
+### ❓ Open Questions
+- [each unanswered question or unresolved point]
+
+### ➡️ Next Steps
+- [who needs to do what, with dates if any]
+
+Messages, oldest first:
+{text}"""
+
+
+def summarize_thread(text):
+    """A short structured summary (as HTML) of a whole conversation. Raises if the AI call fails."""
+    return clean_summary_text(_generate(THREAD_PROMPT.format(text=text)))
 
 
 def summarize_email(text):
@@ -86,6 +129,11 @@ def clean_summary_text(raw_text):
         elif stripped.startswith("### ⚡ Tasks & Deadlines"):
             processed_blocks.append(
                 "<div class='text-red-400 font-bold border-b border-red-500/20 pb-1 mb-2 text-xs uppercase tracking-wider mt-4'>⚡ Action Tasks & Deadlines</div>"
+            )
+        elif stripped.startswith("### "):
+            title = html.escape(stripped.removeprefix("### ").strip())
+            processed_blocks.append(
+                f"<div class='text-slate-300 font-bold border-b border-slate-500/20 pb-1 mb-2 text-xs uppercase tracking-wider mt-4'>{title}</div>"
             )
         elif stripped.startswith("-") or stripped.startswith("*"):
             clean_item = html.escape(stripped.lstrip("-* ").strip())

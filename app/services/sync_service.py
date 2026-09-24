@@ -10,6 +10,7 @@ from ..providers import ProviderAuthError, get_provider
 from ..repositories import accounts as accounts_repo
 from ..repositories import emails as emails_repo
 from ..repositories import rules as rules_repo
+from . import embeddings
 from .activities_service import create_activities_for_emails
 from .ai_summarizer import summarize_email
 from .email_processor import process_emails
@@ -55,6 +56,7 @@ def sync_account(db: Session, account: MailAccount, timeframe: str) -> int:
     logger.info("Synced %s (%s): %d listed, %d new", account.email_address, timeframe, len(ids), len(raw))
 
     summarize_pending(db, account.id)
+    embeddings.embed_pending(db, account.id)
     return len(raw)
 
 

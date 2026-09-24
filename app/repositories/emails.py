@@ -210,3 +210,48 @@ def newsletter_groups(db: Session, user_id: int, days: int = 30, min_count: int 
             group["unsubscribe_url"] = email.unsubscribe_url
             group["one_click"] = email.unsubscribe_one_click
     return sorted((g for g in groups.values() if g["count"] >= min_count), key=lambda g: -g["count"])
+
+
+# --- embeddings (semantic search) ----------------------------------------------------------------
+
+EMBED_MAX_AGE_DAYS = 400
+
+
+def list_pending_embeddings(db: Session, account_id: int, limit: int) -> list[Email]:
+    """Newest emails of a mailbox that do not have a vector yet."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=EMBED_MAX_AGE_DAYS)
+    query = select(Email).where(Email.account_id == account_id, Email.embedding.is_(None), Email.date >= cutoff)
+    return list(db.scalars(query.order_by(Email.date.desc()).limit(limit)))
+
+
+def set_embeddings(db: Session, vectors: dict[str, bytes]) -> None:
+    for email_id, blob in vectors.items():
+        db.execute(update(Email).where(Email.id == email_id).values(embedding=blob))
+    db.commit()
+
+
+def search_candidates(
+    db: Session,
+    user_id: int,
+    *,
+    account_id: int | None = None,
+    category: str | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    sender: str | None = None,
+    limit: int = 5000,
+) -> list[Email]:
+    """The user's mail (any state) a smart search should rank: newest first, capped."""
+    conditions = [Email.user_id == user_id]
+    if account_id is not None:
+        conditions.append(Email.account_id == account_id)
+    if category:
+        conditions.append(Email.category == category)
+    if date_from is not None:
+        conditions.append(Email.date >= date_from)
+    if date_to is not None:
+        conditions.append(Email.date < date_to)
+    if sender:
+        like = _like(sender.lower())
+        conditions.append(or_(Email.sender_address.like(like, escape=chr(92)), Email.sender.ilike(like, escape=chr(92))))
+    return list(db.scalars(select(Email).where(*conditions).order_by(Email.date.desc()).limit(limit)))
