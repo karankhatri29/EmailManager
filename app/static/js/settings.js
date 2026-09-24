@@ -15,7 +15,7 @@ const OPTIONS = {
     accent: ['violet', 'pink', 'blue', 'mint', 'sunset'],
     density: ['compact', 'comfortable', 'roomy'],
     motion: ['auto', 'full', 'reduced'],
-    timeframe: ['Last 1 Day', 'Last 1 Week', 'Last 1 Month'],
+    timeframe: ['Last 1 Day', 'Last 1 Week', 'Last 1 Month', 'Last 3 Months', 'Last 1 Year'],
 };
 
 export const DEFAULTS = {
@@ -172,6 +172,7 @@ function syncControls() {
 function openSettings() {
     syncControls();
     show($('settingsModal'), true);
+    document.dispatchEvent(new CustomEvent('settingsopen')); // the account section loads its own values
     $('settingsClose').focus();
 }
 

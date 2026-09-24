@@ -104,6 +104,7 @@ def _no_real_ai():
         patch("app.services.ai_summarizer._generate", refuse),
         patch("app.services.ai_summarizer.generate_json", refuse),
         patch("app.services.embeddings.embed_texts", refuse),
+        patch("app.services.ai_summarizer.is_configured", lambda: True),  # tests decide what the AI answers
     ):
         yield
 

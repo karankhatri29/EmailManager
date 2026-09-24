@@ -3,7 +3,8 @@ import { state } from './state.js';
 import { providerLabel } from './accounts.js';
 import { renderExplorer } from './explorer.js';
 import { loadDashActivities, renderAll, widgetOn } from './kpis.js';
-import { $, esc, senderName } from './util.js';
+import { bindMailTools, mailToolsHtml } from './mailtools.js';
+import { $, esc, senderName, toast } from './util.js';
 
 const URGENT = 'Urgent / Action Required';
 
@@ -161,6 +162,7 @@ export function openEmailDrawer(emailId, known = null) {
                 ${gmailLink ? `<a href="${esc(gmailLink)}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">Open in Gmail ↗</a>` : ''}
             </div>
         </div>
+        ${mailToolsHtml(email)}
         <div class="flex-1 overflow-y-auto p-6 space-y-5">
             <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
                 ${email.summary
@@ -169,11 +171,19 @@ export function openEmailDrawer(emailId, known = null) {
             </div>
             <div class="border border-slate-700/50 rounded-lg bg-slate-900/50">
                 <div class="p-3 bg-slate-800/50 border-b border-slate-700/50 rounded-t-lg">
-                    <span class="text-xs font-bold text-slate-400 uppercase">📄 Original message</span>
+                    <span class="text-xs font-bold text-slate-400 uppercase">Original message</span>
                 </div>
                 <div class="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words">${esc(email.body)}</div>
             </div>
         </div>`;
+
+    bindMailTools($('drawerContent'), email, (updated, message) => {
+        const at = state.emails.findIndex((e) => e.id === updated.id);
+        if (at >= 0) state.emails[at] = updated;
+        if (message) toast(message, 'success');
+        openEmailDrawer(updated.id, updated);
+        document.dispatchEvent(new CustomEvent('emailchanged'));
+    });
 
     $('drawer').classList.remove('translate-x-full');
     $('drawerBackdrop').classList.remove('hidden');
@@ -192,6 +202,7 @@ export function initDashboard() {
     $('drawerClose').addEventListener('click', closeEmailDrawer);
     $('drawerBackdrop').addEventListener('click', closeEmailDrawer);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeEmailDrawer(); });
+    document.addEventListener('emailchanged', () => loadEmails({ silent: true })); // category, done or snooze changed
     document.addEventListener('tripschanged', renderHome); // a scan found (or changed) bookings
     document.addEventListener('dashchange', renderHome); // Settings switched a number or widget on/off
 }

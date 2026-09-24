@@ -79,7 +79,7 @@
                 </span>
                 <h1 class="wordmark text-2xl">Email <span class="text-gradient">Prioritizer</span></h1>
             </div>
-            <p class="text-slate-400 text-sm mb-6">Your inbox, ranked. Your deadlines, sorted. ✨</p>
+            <p class="text-slate-400 text-sm mb-6">Your inbox, ranked. Your deadlines, sorted. </p>
             <h2 id="authTitle" class="text-lg font-bold text-fg mb-4">Welcome back</h2>
             <form id="authForm" class="space-y-3">
                 <input id="authEmail" type="email" required autocomplete="email" placeholder="Email" class="field">
@@ -122,22 +122,31 @@
                         <option value="Last 1 Day">Last 24 Hours</option>
                         <option value="Last 1 Week">Last 7 Days</option>
                         <option value="Last 1 Month">Last 30 Days</option>
+                        <option value="Last 3 Months">Last 3 Months</option>
+                        <option value="Last 1 Year">Last Year</option>
                     </select>
                 </div>
 
                 <button id="syncNow" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2.5 px-4 rounded-lg mb-2 transition whitespace-nowrap cursor-pointer shrink-0">
-                    🔄 Sync now
+                    Sync now
                 </button>
                 <p id="syncStatusSide" class="sm:hidden text-xs font-medium text-slate-500 mb-4 min-h-[1rem]" aria-live="polite"></p>
                 <div class="hidden sm:block mb-4"></div>
+
+                <nav id="sideNav" class="flex flex-col gap-1 mb-4 shrink-0" aria-label="More">
+                    <p class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider mb-1">More</p>
+                    <button type="button" data-nav="tools" class="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:bg-slate-700/40 hover:text-fg cursor-pointer text-left aria-[current=page]:bg-slate-700/50 aria-[current=page]:text-fg"><span data-icon="inbox" data-icon-class="w-4 h-4"></span>Inbox tools</button>
+                    <button type="button" data-nav="timetable" class="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:bg-slate-700/40 hover:text-fg cursor-pointer text-left aria-[current=page]:bg-slate-700/50 aria-[current=page]:text-fg"><span data-icon="timetable" data-icon-class="w-4 h-4"></span>Timetable</button>
+                    <button type="button" data-nav="todos" class="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:bg-slate-700/40 hover:text-fg cursor-pointer text-left aria-[current=page]:bg-slate-700/50 aria-[current=page]:text-fg"><span data-icon="todo" data-icon-class="w-4 h-4"></span>To-do</button>
+                </nav>
 
                 <hr class="border-slate-700/50 mb-5 shrink-0">
 
                 <div class="flex items-center justify-between mb-3 shrink-0">
                     <h2 class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Mailboxes</h2>
                     <div class="flex gap-3">
-                        <button id="connectGmail" class="text-xs font-semibold text-blue-400 hover:text-blue-300 cursor-pointer whitespace-nowrap">＋ Gmail</button>
-                        <button id="connectOutlook" class="text-xs font-semibold text-blue-400 hover:text-blue-300 cursor-pointer whitespace-nowrap">＋ Outlook</button>
+                        <button id="connectGmail" class="text-xs font-semibold text-blue-400 hover:text-blue-300 cursor-pointer whitespace-nowrap">+ Gmail</button>
+                        <button id="connectOutlook" class="text-xs font-semibold text-blue-400 hover:text-blue-300 cursor-pointer whitespace-nowrap">+ Outlook</button>
                     </div>
                 </div>
                 <div id="accountList" class="space-y-2 overflow-y-auto min-h-0 flex-1"></div>
@@ -145,7 +154,7 @@
                 <div class="mt-4 pt-4 border-t border-slate-700/50 shrink-0">
                     <p id="userEmail" class="text-xs text-slate-400 truncate mb-2"></p>
                     <div class="flex items-center gap-4">
-                        <button data-open-settings class="text-xs font-semibold text-slate-300 hover:text-fg cursor-pointer">⚙️ Settings</button>
+                        <button data-open-settings class="text-xs font-semibold text-slate-300 hover:text-fg cursor-pointer">Settings</button>
                         <button id="logout" class="text-xs text-slate-500 hover:text-fg cursor-pointer">Sign out</button>
                     </div>
                 </div>
@@ -182,11 +191,21 @@
                     <span class="logo-tile sm:hidden" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-5 h-5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0-9.75 6.5-9.75-6.5" /></svg></span>
                     <h1 id="pageTitle" class="text-lg font-extrabold tracking-tight text-fg truncate">Home</h1>
                 </div>
-                <button id="tab-dashboard" class="hidden lg:inline-block btn-active px-3 sm:px-5 py-2 rounded-lg text-sm font-semibold transition cursor-pointer whitespace-nowrap">🏠 <span class="hidden sm:inline">Command Center</span><span class="sm:hidden">Home</span></button>
-                <button id="tab-activity" class="hidden lg:inline-block btn-inactive px-3 sm:px-5 py-2 rounded-lg text-sm font-semibold transition cursor-pointer whitespace-nowrap">📅 <span class="hidden min-[360px]:inline">Activity</span></button>
+                <button id="tab-dashboard" class="hidden lg:inline-block btn-active px-3 sm:px-5 py-2 rounded-lg text-sm font-semibold transition cursor-pointer whitespace-nowrap"><span class="hidden sm:inline">Command Center</span><span class="sm:hidden">Home</span></button>
+                <button id="tab-activity" class="hidden lg:inline-block btn-inactive px-3 sm:px-5 py-2 rounded-lg text-sm font-semibold transition cursor-pointer whitespace-nowrap"><span class="hidden min-[360px]:inline">Activity</span></button>
                 <button id="tab-trips" class="hidden lg:inline-block btn-inactive px-3 sm:px-5 py-2 rounded-lg text-sm font-semibold transition cursor-pointer whitespace-nowrap">Trips</button>
                 <span id="syncStatus" class="ml-auto self-center text-xs font-medium text-slate-500" aria-live="polite"></span>
-                <button id="themeToggle" class="icon-btn ml-auto sm:ml-0" aria-label="Switch between light and dark" title="Switch between light and dark">
+                <div class="relative ml-auto sm:ml-0">
+                    <button id="bellBtn" type="button" class="icon-btn relative" aria-label="Notifications" aria-haspopup="true" aria-expanded="false" aria-controls="bellPanel"></button>
+                    <div id="bellPanel" class="hidden absolute right-0 top-full mt-2 w-[min(23rem,calc(100vw-1.5rem))] glass-card modal-card z-50 overflow-hidden">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-700/50">
+                            <p class="text-sm font-extrabold text-fg">Notifications</p>
+                            <button id="bellMarkAll" type="button" class="hidden text-xs font-semibold text-blue-400 hover:text-blue-300 cursor-pointer">Mark all read</button>
+                        </div>
+                        <ul id="bellList" class="max-h-[60dvh] overflow-y-auto divide-y divide-slate-700/40"></ul>
+                    </div>
+                </div>
+                <button id="themeToggle" class="icon-btn" aria-label="Switch between light and dark" title="Switch between light and dark">
                     <svg class="icon-sun w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg>
                     <svg class="icon-moon w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg>
                 </button>
@@ -214,7 +233,7 @@
 
                     <div id="connectPrompt" class="hidden glass-card p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                            <p class="font-bold text-fg">Connect your first mailbox 💌</p>
+                            <p class="font-bold text-fg">Connect your first mailbox </p>
                             <p class="text-sm text-slate-400">We'll rank your mail and turn deadlines into calendar items. Read-only access.</p>
                         </div>
                         <div class="flex flex-wrap gap-2">
@@ -246,8 +265,12 @@
                                 <h3 class="text-sm font-extrabold text-fg tracking-tight">Inbox explorer</h3>
                                 <p id="inboxCount" class="text-xs text-slate-400 mt-0.5" aria-live="polite"></p>
                             </div>
-                            <input id="inboxSearch" type="search" placeholder="Search mail" aria-label="Search mail" autocomplete="off" class="field sm:max-w-[16rem]">
+                            <div class="flex items-center gap-2 w-full sm:w-auto sm:max-w-[24rem]">
+                                <input id="inboxSearch" type="search" placeholder="Search mail, or ask in words" aria-label="Search mail" autocomplete="off" class="field">
+                                <button type="button" id="inboxAsk" class="icon-btn !w-auto px-3 gap-1.5 text-xs font-semibold shrink-0" title="Ask about your mail in plain words, for example: the invoice for the blue couch I bought last summer"><span data-icon="sparkle"></span>Ask</button>
+                            </div>
                         </div>
+                        <p id="inboxAskInfo" class="hidden text-xs text-slate-400 -mt-2" aria-live="polite"></p>
 
                         <div>
                             <div id="priorityChips" class="flex flex-wrap gap-2" role="group" aria-label="Filter by priority"></div>
@@ -312,7 +335,7 @@
                             <button type="button" data-cal-view="week" aria-pressed="false">Week</button>
                             <button type="button" data-cal-view="month" aria-pressed="false">Month</button>
                         </div>
-                        <button id="activityAdd" class="ml-auto sm:ml-0 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-3 sm:px-4 h-8 rounded-lg cursor-pointer whitespace-nowrap">＋ <span class="hidden sm:inline">New activity</span><span class="sm:hidden">New</span></button>
+                        <button id="activityAdd" class="ml-auto sm:ml-0 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-3 sm:px-4 h-8 rounded-lg cursor-pointer whitespace-nowrap">+ <span class="hidden sm:inline">New activity</span><span class="sm:hidden">New</span></button>
                     </div>
                     <div id="weekdayRow" class="grid grid-cols-7 shrink-0"></div>
                     <div id="calendarGrid" class="grid grid-cols-7 grid-rows-6 xl:flex-1 h-[26rem] sm:h-[34rem] xl:h-auto xl:min-h-0"></div>
@@ -321,13 +344,13 @@
                 <div class="w-full xl:w-80 flex flex-col gap-4 xl:min-h-0 shrink-0">
                     <div class="glass-card flex flex-col xl:flex-1 xl:min-h-0 max-h-72 xl:max-h-none">
                         <div class="px-4 py-3.5 border-b border-slate-700/50 flex items-center justify-between shrink-0">
-                            <h3 class="text-sm font-extrabold text-fg tracking-tight">📌 Unscheduled</h3>
+                            <h3 class="text-sm font-extrabold text-fg tracking-tight">Unscheduled</h3>
                             <span id="backlogCount" class="text-xs font-semibold text-slate-400">0</span>
                         </div>
                         <div id="backlogList" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
                     </div>
                     <div class="glass-card p-4 shrink-0">
-                        <p class="text-sm font-bold text-fg mb-1">Use in your calendar app 📆</p>
+                        <p class="text-sm font-bold text-fg mb-1">Use in your calendar app </p>
                         <p class="text-xs text-slate-400 mb-3">Subscribe once and your deadlines show up in Google, Outlook or Apple Calendar.</p>
                         <button id="feedOpen" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-sm font-semibold py-2 rounded-lg cursor-pointer">Get calendar link</button>
                     </div>
@@ -363,12 +386,21 @@
                     <p id="tripsEmptyText" class="text-sm text-slate-400 mt-2 max-w-md mx-auto"></p>
                 </div>
             </div>
+
+            <!-- Inbox tools: briefing, newsletters, follow-ups, rules -->
+            <section id="view-tools" class="hidden"></section>
+
+            <!-- Timetable -->
+            <section id="view-timetable" class="hidden flex-1 overflow-y-auto min-h-0"></section>
+
+            <!-- To-do -->
+            <section id="view-todos" class="hidden flex-1 overflow-y-auto min-h-0"></section>
         </main>
 
         <!-- Email drawer -->
         <div id="drawerBackdrop" class="hidden fixed inset-0 bg-black/50 z-40"></div>
         <aside id="drawer" class="fixed top-0 right-0 h-full w-full max-w-2xl bg-slate-900 border-l border-slate-700/50 shadow-2xl z-50 flex flex-col translate-x-full transition-transform duration-300">
-            <button id="drawerClose" class="absolute top-2 right-2 sm:top-4 sm:right-4 w-10 h-10 flex items-center justify-center text-slate-400 hover:text-fg text-xl cursor-pointer z-10" aria-label="Close">✕</button>
+            <button id="drawerClose" class="absolute top-2 right-2 sm:top-4 sm:right-4 w-10 h-10 flex items-center justify-center text-slate-400 hover:text-fg text-xl cursor-pointer z-10" aria-label="Close">×</button>
             <div id="drawerContent" class="flex flex-col h-full min-h-0"></div>
         </aside>
     </div>
@@ -418,10 +450,10 @@
         <div class="glass-card modal-card w-full max-w-lg max-h-[92dvh] overflow-y-auto p-5 sm:p-6 space-y-6">
             <div class="flex items-start justify-between gap-3">
                 <div>
-                    <h2 id="settingsTitle" class="text-xl font-extrabold tracking-tight text-fg">Settings ⚙️</h2>
+                    <h2 id="settingsTitle" class="text-xl font-extrabold tracking-tight text-fg">Settings </h2>
                     <p class="text-xs text-slate-400 mt-1">Saved on this device. Make it yours.</p>
                 </div>
-                <button id="settingsClose" class="icon-btn -mt-1 -mr-2" aria-label="Close settings">✕</button>
+                <button id="settingsClose" class="icon-btn -mt-1 -mr-2" aria-label="Close settings">×</button>
             </div>
 
             <section class="space-y-3">
@@ -430,9 +462,9 @@
                 <div class="space-y-2">
                     <p class="text-sm font-semibold text-fg">Theme</p>
                     <div class="seg" role="group" aria-label="Theme">
-                        <button type="button" data-pref="theme" data-value="system" aria-pressed="false">🖥️ System</button>
-                        <button type="button" data-pref="theme" data-value="light" aria-pressed="false">☀️ Light</button>
-                        <button type="button" data-pref="theme" data-value="dark" aria-pressed="false">🌙 Dark</button>
+                        <button type="button" data-pref="theme" data-value="system" aria-pressed="false">System</button>
+                        <button type="button" data-pref="theme" data-value="light" aria-pressed="false">Light</button>
+                        <button type="button" data-pref="theme" data-value="dark" aria-pressed="false">Dark</button>
                     </div>
                     <p id="themeHint" class="text-xs text-slate-400"></p>
                 </div>
@@ -474,6 +506,35 @@
                 <div id="dashPrefs" class="space-y-4"></div>
             </section>
 
+            <section id="accountSettings" class="space-y-3 hidden">
+                <h3 class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Account: alerts and automation</h3>
+                <p class="text-xs text-slate-400">Saved to your account, because they run while you are away. <span id="setStatus" class="text-emerald-400" aria-live="polite"></span></p>
+                <p id="setEmailNote" class="hidden text-xs text-amber-400">This server cannot send email yet, so email options only show in the app.</p>
+
+                <div class="space-y-1.5">
+                    <label for="setTz" class="text-sm font-semibold text-fg">Time zone</label>
+                    <div class="flex gap-2"><input id="setTz" list="tzList" class="field" autocomplete="off"><button id="setTzDetect" type="button" class="icon-btn !w-auto px-3 text-xs font-semibold shrink-0">Detect</button></div>
+                    <datalist id="tzList"></datalist>
+                    <p class="text-xs text-slate-400">Decides when "today" starts and how dates like 03/04 are read.</p>
+                </div>
+
+                <div class="flex items-center justify-between gap-3"><label for="setBriefing" class="text-sm text-fg cursor-pointer">Morning briefing</label>
+                    <span class="flex items-center gap-2"><select id="setBriefingHour" class="field !w-auto !py-1.5" aria-label="Briefing time"></select><input id="setBriefing" type="checkbox" class="w-4 h-4 accent-[hsl(var(--brand-h)_92%_60%)]"></span></div>
+                <div class="flex items-center justify-between gap-3"><label for="setDigest" class="text-sm text-fg cursor-pointer">Evening promotions digest</label>
+                    <span class="flex items-center gap-2"><select id="setDigestHour" class="field !w-auto !py-1.5" aria-label="Digest time"></select><input id="setDigest" type="checkbox" class="w-4 h-4 accent-[hsl(var(--brand-h)_92%_60%)]"></span></div>
+                <div class="flex items-center justify-between gap-3"><label for="setAlerts" class="text-sm text-fg cursor-pointer">Alert me about urgent mail</label>
+                    <input id="setAlerts" type="checkbox" class="w-4 h-4 accent-[hsl(var(--brand-h)_92%_60%)]"></div>
+                <div class="flex items-center justify-between gap-3"><label for="setReminders" class="text-sm text-fg cursor-pointer">Also email me task reminders</label>
+                    <input id="setReminders" type="checkbox" class="w-4 h-4 accent-[hsl(var(--brand-h)_92%_60%)]"></div>
+                <div class="flex items-center justify-between gap-3"><label for="setFollowup" class="text-sm text-fg">Nudge me when nobody replies after</label>
+                    <span class="flex items-center gap-2"><input id="setFollowup" type="number" min="1" max="30" class="field !w-20 !py-1.5"><span class="text-sm text-slate-400">days</span></span></div>
+                <div class="flex items-center justify-between gap-3"><label for="setCleanup" class="text-sm text-fg cursor-pointer">Automatically unsubscribe from newsletters I never open</label>
+                    <input id="setCleanup" type="checkbox" class="w-4 h-4 accent-[hsl(var(--brand-h)_92%_60%)]"></div>
+                <div class="flex items-center justify-between gap-3"><label for="setCleanupMonths" class="text-sm text-fg">"Never open" means unread for</label>
+                    <select id="setCleanupMonths" class="field !w-auto !py-1.5"><option value="1">1 month</option><option value="3">3 months</option><option value="6">6 months</option><option value="12">12 months</option></select></div>
+                <p class="text-xs text-slate-400">Cleaning up unsubscribes only when the sender supports one-click, then mutes and archives the sender here. Nothing is changed in your mailbox itself, and every step can be undone under Inbox tools, Rules.</p>
+            </section>
+
             <section class="space-y-3">
                 <h3 class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Inbox</h3>
                 <div class="space-y-2">
@@ -482,6 +543,8 @@
                         <option value="Last 1 Day">Last 24 hours</option>
                         <option value="Last 1 Week">Last 7 days</option>
                         <option value="Last 1 Month">Last 30 days</option>
+                        <option value="Last 3 Months">Last 3 months</option>
+                        <option value="Last 1 Year">Last year</option>
                     </select>
                 </div>
             </section>

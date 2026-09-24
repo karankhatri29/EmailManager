@@ -1,6 +1,7 @@
 import html
 import json
 import logging
+import os
 import re
 
 from google import genai
@@ -61,6 +62,13 @@ def generate_json(prompt, schema):
         config=types.GenerateContentConfig(response_mime_type="application/json", response_schema=schema),
     )
     return json.loads(response.text or "{}")
+
+
+def is_configured():
+    """Whether an API key is available, so optional AI features can be skipped instead of failing slowly."""
+    return bool(
+        get_settings().gemini_api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    )
 
 
 def generate_text(prompt):

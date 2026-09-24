@@ -67,6 +67,8 @@ def _promo_highlights(subjects: list[str]) -> str | None:
     if not subjects:
         return None
     try:
+        if not ai_summarizer.is_configured():
+            raise RuntimeError("no AI key configured")
         text = ai_summarizer.generate_text(PROMO_PROMPT.format(lines="\n".join(f"- {s}" for s in subjects)))
         if text:
             return text

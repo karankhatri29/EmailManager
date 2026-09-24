@@ -14,7 +14,15 @@ from tests.conftest import stored_email
 NOW = datetime(2026, 9, 24, 19, 30, tzinfo=timezone.utc)
 SEND = "app.services.jobs.try_send_email"
 AI = "app.services.digest.ai_summarizer.generate_text"
+
+
 PROMO = "Promotional"
+
+
+@pytest.fixture(autouse=True)
+def _uncached():
+    digest._AI_CACHE.clear()  # the digest remembers the AI's answer for a few minutes
+    yield
 
 
 def _promo(account, mid, subject, sender="Shop <deals@shop.com>", hours_ago=2, **extra):
@@ -226,3 +234,20 @@ def test_auto_cleanup_job_runs_once_a_day_and_notifies(db, user, account):
 def test_auto_cleanup_is_off_by_default(db, user, account):
     emails_repo.upsert_many(db, _newsletter(account, "a", True))
     assert jobs.run_auto_cleanups(db, datetime.now(timezone.utc)) == 0
+
+
+def test_without_an_ai_key_the_digest_never_calls_the_ai(db, user, account):
+    emails_repo.upsert_many(db, [_promo(account, "1", "50% off everything")])
+    with patch("app.services.ai_summarizer.is_configured", return_value=False), patch(AI) as ai:
+        d = digest.build_digest(db, user, settings_repo.get_or_create(db, user.id), NOW)
+    ai.assert_not_called()
+    assert d["deals"][0]["subject"] == "50% off everything"
+
+
+def test_the_same_subjects_are_only_sent_to_the_ai_once(db, user, account):
+    emails_repo.upsert_many(db, [_promo(account, "1", "Alpha sale 20% off")])
+    settings = settings_repo.get_or_create(db, user.id)
+    with patch(AI, return_value="1") as ai:
+        digest.build_digest(db, user, settings, NOW)
+        digest.build_digest(db, user, settings, NOW)
+    assert ai.call_count == 1

@@ -108,7 +108,7 @@ function dayRow(a) {
             <div class="min-w-0">
                 <p class="text-sm font-semibold leading-snug">${esc(a.title)}</p>
                 ${a.notes ? `<p class="text-xs opacity-70 mt-0.5 line-clamp-2">${esc(a.notes)}</p>` : ''}
-                ${a.source === 'email' ? '<p class="text-[10px] opacity-70 mt-0.5">✉ from email</p>' : ''}
+                ${a.source === 'email' ? '<p class="text-[10px] opacity-70 mt-0.5">from email</p>' : ''}
             </div>
         </div>`;
 }
@@ -151,7 +151,6 @@ function dayPanel(d, byDay) {
     const body = items.length
         ? items.map(dayRow).join('')
         : `<div class="flex-1 flex flex-col items-center justify-center text-center gap-1 py-12 text-slate-400">
-               <p class="text-3xl" aria-hidden="true">🌴</p>
                <p class="text-sm font-bold text-fg">Nothing planned</p>
                <p class="text-xs">Tap anywhere to add something for this day.</p>
            </div>`;
@@ -198,7 +197,7 @@ function renderBacklog() {
                 <button data-done="${a.id}" class="mt-0.5 w-4 h-4 rounded border border-slate-500 hover:border-emerald-400 shrink-0 cursor-pointer" title="Mark done"></button>
                 <div class="min-w-0">
                     <p class="text-sm text-slate-200 leading-snug">${esc(a.title)}</p>
-                    <p class="text-[10px] text-slate-500 mt-0.5">${a.source === 'email' ? '✉ from email · ' : ''}drag onto a day to schedule</p>
+                    <p class="text-[10px] text-slate-500 mt-0.5">${a.source === 'email' ? 'from email · ' : ''}drag onto a day to schedule</p>
                 </div>
             </div>`).join('')
         : '<p class="text-xs text-slate-500 p-2">Nothing waiting to be scheduled.</p>';

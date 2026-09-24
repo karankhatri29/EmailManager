@@ -4,9 +4,15 @@ import { loadActivities, initActivity } from './activity.js';
 import { initAccounts, loadAccounts, renderAccountFilter } from './accounts.js';
 import { setUnauthorizedHandler, api } from './api.js';
 import { initAuth, logout } from './auth.js';
+import { initAccountSettings } from './accountsettings.js';
 import { initDashboard, loadEmails, openEmailDrawer, renderCharts } from './dashboard.js';
 import { initExplorer } from './explorer.js';
+import { hydrateIcons } from './icons.js';
 import { initKpis } from './kpis.js';
+import { initNotifications, loadNotifications } from './notifications.js';
+import { initTimetable, loadTimetable } from './timetable.js';
+import { initTodos, loadTodos } from './todos.js';
+import { initTools, loadTools, showPanel } from './tools.js';
 import { initTrips, loadTrips } from './trips.js';
 import { getPrefs, initSettings } from './settings.js';
 import { state } from './state.js';
@@ -34,23 +40,34 @@ function showApp() {
 }
 
 function switchTab(name) {
-    const tabs = { dashboard: 'view-dashboard', activity: 'view-activity', trips: 'view-trips' };
+    const tabs = {
+        dashboard: 'view-dashboard', activity: 'view-activity', trips: 'view-trips',
+        tools: 'view-tools', timetable: 'view-timetable', todos: 'view-todos',
+    };
+    const blockViews = ['view-timetable', 'view-todos']; // these scroll as a normal block; the others are flex columns
     // The bottom bar (phone) and rail (tablet) mirror the tabs, and the top bar shows the page title.
-    $('pageTitle').textContent = { activity: 'Activity', trips: 'Trips' }[name] || 'Home';
+    $('pageTitle').textContent = {
+        activity: 'Activity', trips: 'Trips', tools: 'Inbox tools', timetable: 'Timetable', todos: 'To-do',
+    }[name] || 'Home';
     document.querySelectorAll('[data-nav]').forEach((item) => {
         if (item.dataset.nav === name) item.setAttribute('aria-current', 'page');
         else item.removeAttribute('aria-current');
     });
     for (const [tab, viewId] of Object.entries(tabs)) {
         const active = tab === name;
-        show($(viewId), active);
-        const button = $(`tab-${tab}`);
-        button.classList.toggle('btn-active', active);
-        button.classList.toggle('btn-inactive', !active);
+        show($(viewId), active, blockViews.includes(viewId) ? 'block' : 'flex');
+        const button = $(`tab-${tab}`); // the extra views (tools, timetable, to-do) live in the menu, not the top bar
+        if (button) {
+            button.classList.toggle('btn-active', active);
+            button.classList.toggle('btn-inactive', !active);
+        }
     }
     if (name === 'dashboard') renderCharts();
     if (name === 'activity') loadActivities();
     if (name === 'trips') loadTrips().catch(() => {});
+    if (name === 'tools') loadTools();
+    if (name === 'timetable') loadTimetable();
+    if (name === 'todos') loadTodos();
 }
 
 // --- background sync status ----------------------------------------------------------------------
@@ -68,7 +85,7 @@ function setSyncStatus(html, cls) {
 }
 
 async function refreshEverything({ silent = true } = {}) {
-    await Promise.all([loadEmails({ silent }), loadAccounts(), loadActivities(), loadTrips().catch(() => {})]);
+    await Promise.all([loadEmails({ silent }), loadAccounts(), loadActivities(), loadTrips().catch(() => {}), loadNotifications()]);
 }
 
 async function pollSync() {
@@ -80,9 +97,9 @@ async function pollSync() {
             setSyncStatus('<span class="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse mr-2"></span>Syncing in background…', 'text-blue-400');
             await loadEmails({ silent: true }); // show new emails and summaries as they land
         } else if (s.error) {
-            setSyncStatus(`⚠ Sync problem: ${s.error.replace(/^\w+: /, '')}`, 'text-red-400');
+            setSyncStatus(`Sync problem: ${s.error.replace(/^\w+: /, '')}`, 'text-red-400');
         } else if (s.finished_at) {
-            setSyncStatus(`✓ Synced ${new Date(s.finished_at).toLocaleTimeString()}`, 'text-emerald-400');
+            setSyncStatus(`Synced ${new Date(s.finished_at).toLocaleTimeString()}`, 'text-emerald-400');
         } else {
             setSyncStatus('', 'text-slate-500');
         }
@@ -136,6 +153,7 @@ async function startApp(user) {
 
     await loadAccounts();
     await Promise.all([loadEmails(), loadActivities()]); // instant: served from the database
+    loadNotifications();
     loadTrips().catch(() => {}); // starts the ticket scan if this mailbox has not been scanned lately
     await pollSync();
     clearInterval(pollTimer);
@@ -190,6 +208,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initActivity();
     initExplorer({ openEmail: openEmailDrawer });
     initTrips({ openEmail: (id, email) => openEmailDrawer(id, email), goTrips: () => switchTab('trips') });
+    initTools({ openEmail: openEmailDrawer });
+    initTimetable();
+    initTodos();
+    initAccountSettings();
+    initNotifications({ goTools: (kind) => { showPanel({ followup: 'followups', cleanup: 'newsletters' }[kind] || 'briefing'); switchTab('tools'); }, goActivity: () => switchTab('activity') });
+    hydrateIcons();
     document.addEventListener('taskschanged', () => loadActivities()); // a task added from the inbox shows in the calendar
     initKpis({
         openEmail: openEmailDrawer,
@@ -221,7 +245,10 @@ document.addEventListener('DOMContentLoaded', () => {
     $('syncNow').addEventListener('click', syncNow);
 
     // Phone bottom bar and tablet rail.
-    document.querySelectorAll('[data-nav]').forEach((item) => item.addEventListener('click', () => switchTab(item.dataset.nav)));
+    document.querySelectorAll('[data-nav]').forEach((item) => item.addEventListener('click', () => {
+        switchTab(item.dataset.nav);
+        if (!isDesktop()) setDrawer(false); // the menu sheet closes once you have chosen where to go
+    }));
     document.querySelectorAll('[data-action="sync"]').forEach((item) => item.addEventListener('click', syncNow));
     document.querySelectorAll('[data-action="menu"]').forEach((item) => item.addEventListener('click', () => setDrawer(true)));
     document.querySelectorAll('[data-timeframe]').forEach((chip) => chip.addEventListener('click', () => {

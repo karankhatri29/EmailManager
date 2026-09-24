@@ -10,6 +10,7 @@ amounts, "free", "sale") does the picking, so the digest never depends on the AI
 import html
 import logging
 import re
+import time as time_module
 from datetime import datetime, time, timezone
 
 from sqlalchemy.orm import Session
@@ -64,15 +65,37 @@ def _pick_by_score(promos: list[Email]) -> list[Email]:
     return picked
 
 
+_AI_CACHE: dict[tuple[str, ...], tuple[float, str]] = {}
+_AI_CACHE_SECONDS = 600  # the digest can be opened often; the same subjects give the same answer
+
+
+def _ai_available() -> bool:
+    return ai_summarizer.is_configured()
+
+
+def _ai_answer(subjects: tuple[str, ...]) -> str | None:
+    cached = _AI_CACHE.get(subjects)
+    if cached and time_module.monotonic() - cached[0] < _AI_CACHE_SECONDS:
+        return cached[1]
+    if not _ai_available():
+        return None
+    try:
+        lines = "\n".join(f"{n}. {subject}" for n, subject in enumerate(subjects, 1))
+        answer = ai_summarizer.generate_text(_ORDER_PROMPT.format(lines=lines))
+    except Exception:
+        logger.info("Deal picking by AI unavailable; scoring subjects instead", exc_info=True)
+        return None
+    if len(_AI_CACHE) > 200:
+        _AI_CACHE.clear()
+    _AI_CACHE[subjects] = (time_module.monotonic(), answer or "")
+    return answer
+
+
 def _pick_by_ai(promos: list[Email]) -> list[Email] | None:
     """The AI's choice among the numbered subjects, or None if it is unavailable or answers nonsense."""
     pool = promos[:SUBJECTS_FOR_AI]
-    try:
-        answer = ai_summarizer.generate_text(
-            _ORDER_PROMPT.format(lines="\n".join(f"{n}. {e.subject}" for n, e in enumerate(pool, 1)))
-        )
-    except Exception:
-        logger.info("Deal picking by AI unavailable; scoring subjects instead", exc_info=True)
+    answer = _ai_answer(tuple(e.subject for e in pool))
+    if answer is None:
         return None
     picked: list[Email] = []
     for number in re.findall(r"\d+", answer or ""):

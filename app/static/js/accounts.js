@@ -26,7 +26,7 @@ export function renderAccounts() {
             <div class="flex items-center gap-2">
                 ${statusDot(a)}
                 <span class="text-xs text-slate-200 truncate flex-1" title="${esc(a.email_address)}">${esc(a.email_address)}</span>
-                <button data-remove="${a.id}" class="text-slate-500 hover:text-red-400 text-xs cursor-pointer" title="Disconnect">✕</button>
+                <button data-remove="${a.id}" class="text-slate-500 hover:text-red-400 text-xs cursor-pointer" title="Disconnect">×</button>
             </div>
             <div class="text-[10px] text-slate-500 mt-1 ml-4">${esc(providerLabel(a))}</div>
             ${a.status === 'needs_reauth' ? `

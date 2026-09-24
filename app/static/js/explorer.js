@@ -27,8 +27,9 @@ const RANK = Object.fromEntries(CATEGORIES.map((c, i) => [c.id, i]));
 // Stacking order in a bar, bottom to top: the urgent slice sits on top where it is easiest to spot.
 const STACK = [...CATEGORIES].reverse();
 
-const view = { priority: null, bucket: null, sender: null, query: '', sort: 'smart', shown: PAGE_SIZE };
+const view = { priority: null, bucket: null, sender: null, query: '', sort: 'smart', shown: PAGE_SIZE, ask: null };
 let hooks = { openEmail() {} };
+let typingTimer = null; // debounce for the live filter; "Ask" cancels a pending one
 
 const colour = (id) => CATEGORY_COLORS[id] || '#94a3b8';
 
@@ -47,11 +48,14 @@ function buildBuckets() {
             buckets.push({ start, end: new Date(start.getTime() + HOUR_MS) });
         }
     } else {
-        const days = state.timeframe === 'Last 1 Week' ? 7 : 30;
-        for (let i = days; i >= 0; i -= 1) {
+        // A day per bar up to a month; a week per bar beyond that.
+        const days = { 'Last 1 Week': 7, 'Last 1 Month': 30, 'Last 3 Months': 91, 'Last 1 Year': 364 }[state.timeframe] || 30;
+        const step = days > 31 ? 7 : 1;
+        for (let i = Math.ceil(days / step); i >= 0; i -= 1) {
             buckets.push({
-                start: new Date(now.getFullYear(), now.getMonth(), now.getDate() - i),
-                end: new Date(now.getFullYear(), now.getMonth(), now.getDate() - i + 1),
+                start: new Date(now.getFullYear(), now.getMonth(), now.getDate() - i * step),
+                end: new Date(now.getFullYear(), now.getMonth(), now.getDate() - i * step + step),
+                weekly: step > 1,
             });
         }
     }
@@ -59,6 +63,7 @@ function buildBuckets() {
 }
 
 function bucketLabel(bucket, hourly) {
+    if (bucket.weekly) return `Week of ${bucket.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
     return hourly
         ? `${bucket.start.toLocaleDateString('en-US', { weekday: 'short' })} ${bucket.start.toLocaleTimeString('en-US', { hour: 'numeric' })}`
         : bucket.start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -139,7 +144,7 @@ function renderTimeline() {
     }).join('');
 
     // Axis labels, thinned so they never collide (about one per 4 hours / 1 day / 5 days).
-    const step = hourly ? 4 : buckets.length <= 8 ? 1 : 5;
+    const step = hourly ? 4 : buckets.length <= 8 ? 1 : buckets.length > 40 ? 8 : 5;
     $('timelineAxis').innerHTML = rows.map((row, i) => `
         <span class="tl-tick">${i % step === 0 ? esc(hourly
         ? row.bucket.start.toLocaleTimeString('en-US', { hour: 'numeric' }).replace(' ', '').toLowerCase()
@@ -180,14 +185,14 @@ function sorted(list) {
 }
 
 function row(e) {
-    const preview = plain(e.summary) || plain(e.body);
+    const preview = plain(e.summary) || plain(e.body) || plain(e.snippet);
     const account = state.accounts.length > 1 ? state.accounts.find((a) => a.id === e.account_id) : null;
     return `
-        <div data-email="${esc(e.id)}" class="xrow group" role="button" tabindex="0">
+        <div data-email="${esc(e.id)}" class="xrow group ${e.is_done ? 'opacity-60' : ''}" role="button" tabindex="0">
             <span class="w-2.5 h-2.5 rounded-full shrink-0 mt-1.5" style="background:${colour(e.category)}" title="${esc(e.category)}"></span>
             <div class="min-w-0 flex-1">
                 <div class="flex items-center justify-between gap-2">
-                    <span class="text-xs font-bold text-slate-300 truncate">${esc(senderName(e.sender))}</span>
+                    <span class="text-xs font-bold text-slate-300 truncate">${esc(senderName(e.sender))}${e.is_done ? ' <span class="text-[10px] font-semibold text-emerald-400">Done</span>' : ''}</span>
                     <span class="text-[11px] text-slate-500 whitespace-nowrap">${esc(whenLabel(e.date))}</span>
                 </div>
                 <p class="text-sm font-semibold text-fg truncate group-hover:text-blue-400 transition-colors">${esc(e.subject)}</p>
@@ -202,14 +207,25 @@ function row(e) {
 }
 
 function renderList() {
-    const list = sorted(matching());
+    // "Ask" results are already ranked by relevance, and cover all stored mail, not just this timeframe.
+    const list = view.ask ? view.ask.items : sorted(matching());
     const visible = list.slice(0, view.shown);
 
-    $('inboxCount').textContent = anyFilter()
+    const info = $('inboxAskInfo');
+    info.classList.toggle('hidden', !view.ask);
+    if (view.ask) {
+        info.textContent = `${view.ask.plan.explanation}${view.ask.semantic ? ', ranked by meaning' : ''}. ${list.length} result${list.length === 1 ? '' : 's'}.`;
+    }
+
+    $('inboxCount').textContent = view.ask
+        ? 'Answers to your question'
+        : anyFilter()
         ? `${list.length} of ${state.emails.length} emails`
         : `${state.emails.length} email${state.emails.length === 1 ? '' : 's'}`;
 
-    if (!state.emails.length) {
+    if (view.ask && !list.length) {
+        $('inboxList').innerHTML = '<p class="text-sm text-slate-500 py-10 text-center">Nothing in your stored mail matches that. Try different words, or sync a longer timeframe.</p>';
+    } else if (!state.emails.length && !view.ask) {
         $('inboxList').innerHTML = `<p class="text-sm text-slate-500 py-10 text-center">${state.accounts.length ? 'No mail in this period.' : 'Connect a mailbox to see your mail here.'}</p>`;
     } else if (!list.length) {
         $('inboxList').innerHTML = `
@@ -235,8 +251,10 @@ function renderFilterBar() {
     if (view.bucket) add('bucket', bucketLabel(view.bucket, timelineData.hourly));
     if (view.sender) add('sender', `From ${view.sender}`);
     if (view.query.trim()) add('query', `"${view.query.trim()}"`);
+    if (view.ask) add('ask', `Asked: ${view.ask.question}`);
 
     bar.classList.toggle('hidden', !chips.length);
+    bar.classList.toggle('flex', chips.length > 0);
     bar.innerHTML = chips.length
         ? chips.join('') + '<button type="button" data-clear class="text-xs font-semibold text-slate-400 hover:text-fg cursor-pointer ml-1">Clear all</button>'
         : '';
@@ -272,8 +290,37 @@ export function setSender(name) {
     if (view.sender) reveal();
 }
 
+// Natural-language search over everything stored (the server plans it: keywords, dates, sender, category).
+async function ask() {
+    const question = $('inboxSearch').value.trim();
+    if (question.length < 2) { toast('Type a question first, for example: the invoice from last summer.', 'info', 3500); return; }
+    clearTimeout(typingTimer);
+    const button = $('inboxAsk');
+    button.disabled = true;
+    try {
+        const params = { q: question, ...(state.accountFilter !== null ? { account_id: state.accountFilter } : {}) };
+        const result = await api('/api/search', { params });
+        view.ask = { question, plan: result.plan, semantic: result.semantic, items: result.items };
+        view.query = '';
+        refresh();
+    } catch (err) {
+        toast(err.message, 'error');
+    } finally {
+        button.disabled = false;
+    }
+}
+
+async function openHit(emailId) {
+    if (state.emails.some((e) => e.id === emailId)) return hooks.openEmail(emailId);
+    try {
+        return hooks.openEmail(emailId, await api(`/api/emails/${encodeURIComponent(emailId)}`)); // older than this timeframe
+    } catch (err) {
+        return toast(err.message, 'error');
+    }
+}
+
 async function addTask(emailId) {
-    const email = state.emails.find((e) => e.id === emailId);
+    const email = state.emails.find((e) => e.id === emailId) || (view.ask && view.ask.items.find((e) => e.id === emailId));
     if (!email) return;
     try {
         await api('/api/activities', {
@@ -308,12 +355,12 @@ export function initExplorer(wiring = {}) {
         const drop = target.closest('[data-drop]');
         if (drop) {
             const key = drop.dataset.drop;
-            view[key] = key === 'query' ? '' : null;
+            view[key] = key === 'query' ? '' : null; // 'ask' is dropped the same way
             if (key === 'query') $('inboxSearch').value = '';
             return refresh();
         }
         if (target.closest('[data-clear]')) {
-            Object.assign(view, { priority: null, bucket: null, sender: null, query: '' });
+            Object.assign(view, { priority: null, bucket: null, sender: null, query: '', ask: null });
             $('inboxSearch').value = '';
             return refresh();
         }
@@ -324,14 +371,14 @@ export function initExplorer(wiring = {}) {
         const add = target.closest('[data-addtask]');
         if (add) return addTask(add.dataset.addtask);
         const item = target.closest('[data-email]');
-        if (item) hooks.openEmail(item.dataset.email);
+        if (item) openHit(item.dataset.email);
     });
 
     card.addEventListener('keydown', (event) => {
         const item = event.target.closest('[data-email]');
         if (item && event.target === item && (event.key === 'Enter' || event.key === ' ')) {
             event.preventDefault();
-            hooks.openEmail(item.dataset.email);
+            openHit(item.dataset.email);
         }
     });
 
@@ -344,10 +391,12 @@ export function initExplorer(wiring = {}) {
         setCaption(view.bucket ? timelineData.rows.findIndex((r) => r.bucket.start.getTime() === view.bucket.start.getTime()) : -1);
     });
 
-    let timer = null;
+    $('inboxAsk').addEventListener('click', ask);
+    $('inboxSearch').addEventListener('keydown', (event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) ask(); });
+
     $('inboxSearch').addEventListener('input', (event) => {
-        clearTimeout(timer);
-        timer = setTimeout(() => { view.query = event.target.value; refresh(); }, 150);
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(() => { view.query = event.target.value; view.ask = null; refresh(); }, 150);
     });
 
     document.addEventListener('themechange', renderExplorer); // bar colours come from the theme
