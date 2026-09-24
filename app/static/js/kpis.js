@@ -10,6 +10,7 @@ import { KPI_CATALOG } from './dashboard-catalog.js';
 import { focusPriority, renderExplorer, setSender } from './explorer.js';
 import { cssVar, getDashPrefs } from './settings.js';
 import { CATEGORY_COLORS, state } from './state.js';
+import { renderTripsCard, upcomingTrips } from './trips.js';
 import { $, esc, localYmd, senderName, timeOf, toast } from './util.js';
 
 const URGENT = 'Urgent / Action Required';
@@ -311,6 +312,7 @@ function applyVisibility() {
     const show = (id, visible) => $(`card-${id}`).classList.toggle('hidden', !visible);
 
     show('focus', on('focus'));
+    show('trips', on('trips') && upcomingTrips().length > 0);
     show('inbox', on('inbox'));
     show('senders', on('senders'));
     show('mailboxes', on('mailboxes') && state.accounts.length > 1 && state.accountFilter === null);
@@ -324,6 +326,7 @@ export function renderAll() {
     const m = computeMetrics();
     renderTiles(m);
     if (widgetOn('focus')) renderFocus(m);
+    if (widgetOn('trips')) renderTripsCard();
     if (widgetOn('senders')) renderSenders();
     if (widgetOn('mailboxes')) renderMailboxes();
     if (widgetOn('inbox')) renderExplorer();

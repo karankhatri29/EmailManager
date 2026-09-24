@@ -86,6 +86,23 @@ device live), accent colour, text size, animations, default timeframe, and switc
 and widget (10 numbers and 4 widgets to choose from). The calendar picks Day / Week / Month from the screen size,
 and the toolbar overrides it for the current visit.
 
+### Trips and tickets
+Flights, trains, buses, movies (BookMyShow, PVR, INOX...), events and hotel stays are found in your mail and shown
+as boarding-pass style cards on the **Trips** tab, with a "Coming up" card on the home screen. Each card shows the
+route or title, the date and time with a countdown, the PNR / booking id (tap to copy), seats, class, passengers and
+so on, and can be opened, added to a calendar app as an `.ics`, or added to the Activity calendar.
+
+How it works (`services/bookings.py`, `services/booking_scan.py`, `api/bookings.py`):
+- A rule-based parser reads the sender, subject and labelled lines ("PNR:", "Date of Journey:", "Seats:"). It
+  ignores promotions, OTPs and "rate your trip" mails, notes cancellations and changes, keeps only the latest mail
+  about a trip, and leaves a field out when it cannot find it instead of guessing.
+- Ticket mails are usually older than the inbox window and long, so a separate background scan searches up to 180
+  days back (Gmail search / Microsoft Graph search), reads each hit in full and stores it like any other email. It
+  runs when the Trips tab is opened for a mailbox not scanned in the last 6 hours, or on demand with **Scan my mail**.
+- Times on tickets have no time zone, so they are shown as written. Matching is tuned to typical confirmation
+  layouts; a mail in an unusual layout may show with fewer fields or not be found, and **Open email** always shows
+  the original.
+
 ### Layouts by screen size
 The UI is arranged differently for each kind of screen (`static/css/adaptive.css`; `<html data-ui>` records which):
 

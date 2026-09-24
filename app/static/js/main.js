@@ -7,6 +7,7 @@ import { initAuth, logout } from './auth.js';
 import { initDashboard, loadEmails, openEmailDrawer, renderCharts } from './dashboard.js';
 import { initExplorer } from './explorer.js';
 import { initKpis } from './kpis.js';
+import { initTrips, loadTrips } from './trips.js';
 import { getPrefs, initSettings } from './settings.js';
 import { state } from './state.js';
 import { $, show, toast } from './util.js';
@@ -33,9 +34,9 @@ function showApp() {
 }
 
 function switchTab(name) {
-    const tabs = { dashboard: 'view-dashboard', activity: 'view-activity' };
+    const tabs = { dashboard: 'view-dashboard', activity: 'view-activity', trips: 'view-trips' };
     // The bottom bar (phone) and rail (tablet) mirror the tabs, and the top bar shows the page title.
-    $('pageTitle').textContent = name === 'activity' ? 'Activity' : 'Home';
+    $('pageTitle').textContent = { activity: 'Activity', trips: 'Trips' }[name] || 'Home';
     document.querySelectorAll('[data-nav]').forEach((item) => {
         if (item.dataset.nav === name) item.setAttribute('aria-current', 'page');
         else item.removeAttribute('aria-current');
@@ -49,6 +50,7 @@ function switchTab(name) {
     }
     if (name === 'dashboard') renderCharts();
     if (name === 'activity') loadActivities();
+    if (name === 'trips') loadTrips().catch(() => {});
 }
 
 // --- background sync status ----------------------------------------------------------------------
@@ -66,7 +68,7 @@ function setSyncStatus(html, cls) {
 }
 
 async function refreshEverything({ silent = true } = {}) {
-    await Promise.all([loadEmails({ silent }), loadAccounts(), loadActivities()]);
+    await Promise.all([loadEmails({ silent }), loadAccounts(), loadActivities(), loadTrips().catch(() => {})]);
 }
 
 async function pollSync() {
@@ -134,6 +136,7 @@ async function startApp(user) {
 
     await loadAccounts();
     await Promise.all([loadEmails(), loadActivities()]); // instant: served from the database
+    loadTrips().catch(() => {}); // starts the ticket scan if this mailbox has not been scanned lately
     await pollSync();
     clearInterval(pollTimer);
     pollTimer = setInterval(pollSync, POLL_MS);
@@ -186,6 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initDashboard();
     initActivity();
     initExplorer({ openEmail: openEmailDrawer });
+    initTrips({ openEmail: (id, email) => openEmailDrawer(id, email), goTrips: () => switchTab('trips') });
     document.addEventListener('taskschanged', () => loadActivities()); // a task added from the inbox shows in the calendar
     initKpis({
         openEmail: openEmailDrawer,
@@ -213,6 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     $('tab-dashboard').addEventListener('click', () => switchTab('dashboard'));
     $('tab-activity').addEventListener('click', () => switchTab('activity'));
+    $('tab-trips').addEventListener('click', () => switchTab('trips'));
     $('syncNow').addEventListener('click', syncNow);
 
     // Phone bottom bar and tablet rail.

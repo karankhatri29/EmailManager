@@ -21,6 +21,7 @@ export const KPI_CATALOG = [
 
 export const WIDGET_CATALOG = [
     { id: 'focus', label: 'Do this first', hint: 'The one thing to do next, with Open and Done', default: true },
+    { id: 'trips', label: 'Trips and tickets', hint: 'Your next flights, trains, shows and hotel stays, found in your mail', default: true },
     { id: 'inbox', label: 'Inbox explorer', hint: 'Filter your mail by priority, time, sender and search', default: true },
     { id: 'senders', label: 'Top senders', hint: 'Who fills your inbox the most (tap one to filter)', default: true },
     { id: 'mailboxes', label: 'Mailbox breakdown', hint: 'Compare your connected mailboxes (needs 2 or more)', default: true },

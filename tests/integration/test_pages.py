@@ -89,3 +89,18 @@ def test_inbox_explorer_replaces_the_charts(client):
     for gone in ("pieChart", "lineChart", "plotly"):
         assert gone not in html, gone  # no chart library is loaded any more
     assert client.get("/static/js/explorer.js").status_code == 200
+
+
+def test_trips_view_and_navigation_exist_on_every_screen_size(client):
+    html = client.get("/").text
+    for element in (
+        'id="view-trips"',
+        'id="tripsGrid"',
+        'id="tripsScan"',
+        'id="tripKinds"',
+        'id="tab-trips"',
+        'id="card-trips"',
+    ):
+        assert element in html, element
+    assert html.count('data-nav="trips"') == 2  # phone bottom bar + tablet rail
+    assert client.get("/static/js/trips.js").status_code == 200

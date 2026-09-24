@@ -141,8 +141,9 @@ export function renderCharts() {
 
 // --- email drawer (read one email: summary + original) ------------------------------------------
 
-export function openEmailDrawer(emailId) {
-    const email = state.emails.find((e) => e.id === emailId);
+// `known` is for mail outside the loaded inbox window (e.g. an old ticket), which the caller fetched itself.
+export function openEmailDrawer(emailId, known = null) {
+    const email = known || state.emails.find((e) => e.id === emailId);
     if (!email) return;
     state.selectedEmailId = emailId;
 
@@ -193,5 +194,6 @@ export function initDashboard() {
     $('drawerClose').addEventListener('click', closeEmailDrawer);
     $('drawerBackdrop').addEventListener('click', closeEmailDrawer);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeEmailDrawer(); });
+    document.addEventListener('tripschanged', renderHome); // a scan found (or changed) bookings
     document.addEventListener('dashchange', renderHome); // Settings switched a number or widget on/off
 }

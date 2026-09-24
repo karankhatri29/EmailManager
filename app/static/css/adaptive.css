@@ -47,7 +47,7 @@
     #bottomNav .nav-item { flex: 1; }
 
     /* Keep content clear of the floating bar. */
-    #view-dashboard, #view-activity { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
+    #view-dashboard, #view-activity, #view-trips { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
 
     /* KPI tiles become a swipeable carousel instead of a tall stack. */
     #kpiGrid {
@@ -108,7 +108,7 @@
     #dashMain > #hero, #dashMain > #connectPrompt, #dashMain > #accountFilter,
     #dashMain > #card-focus, #dashMain > #kpiGrid { grid-column: 1 / -1; }
     #kpiGrid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-    #card-inbox { grid-column: 1 / -1; }
+    #card-inbox, #card-trips { grid-column: 1 / -1; }
     #insightRow { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #upNext { width: 32%; }
     .stat-num { font-size: 2.2rem; }
