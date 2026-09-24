@@ -43,7 +43,9 @@ def _build_flow(state: str | None = None, code_verifier: str | None = None) -> F
 def authorization_url() -> tuple[str, str, str]:
     """Returns (url to send the user to, state, PKCE code verifier). Keep state+verifier in the session."""
     flow = _build_flow()
-    url, state = flow.authorization_url(access_type="offline", prompt="consent")
+    url, state = flow.authorization_url(
+        access_type="offline", prompt="select_account consent"
+    )  # pick which Gmail to add
     return url, state, flow.code_verifier
 
 

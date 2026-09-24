@@ -129,3 +129,15 @@ def test_session_cookie_is_httponly_and_samesite(client):
     r = register(client, ALICE)
     cookie = r.headers["set-cookie"].lower()
     assert "httponly" in cookie and "samesite=lax" in cookie
+
+
+def test_invite_only_sign_up_lets_only_listed_addresses_register(client):
+    from unittest.mock import patch
+
+    from app.core.config import get_settings
+
+    restricted = get_settings().model_copy(update={"allowed_emails": " Friend@Example.com , me@x.com"})
+    with patch("app.api.auth.get_settings", return_value=restricted):
+        refused = client.post("/api/auth/register", json={"email": "stranger@x.com", "password": PASSWORD})
+        assert refused.status_code == 403 and "invite only" in refused.json()["detail"]
+        assert register(client, "FRIEND@example.com").status_code == 201  # case does not matter

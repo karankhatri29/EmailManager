@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     # decrypt. Run `python -m scripts.encrypt_stored_mail` to re-encrypt everything with the current key.
     encryption_keys_previous: str = ""
     encrypt_email_text: bool = True  # encrypt email subject / body / summary and calendar notes at rest
+    # Who may create an account here: comma separated email addresses. Empty = anyone (open sign-up).
+    # Use it for a private group; it does not affect which Gmail / Outlook mailboxes a member connects.
+    allowed_emails: str = ""
     session_https_only: bool = False  # set true behind HTTPS in production
     public_base_url: str = "http://localhost:8000"  # used to build calendar feed links
 
@@ -107,6 +110,10 @@ class Settings(BaseSettings):
             "Google OAuth client not configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, "
             "or provide credentials.json."
         )
+
+    @property
+    def allowed_email_set(self) -> set[str]:
+        return {e.strip().lower() for e in self.allowed_emails.split(",") if e.strip()}
 
     @property
     def smtp_configured(self) -> bool:

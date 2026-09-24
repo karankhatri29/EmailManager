@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
+from ..core.config import get_settings
 from ..core.security import login_limiter, verify_password
 from ..db.models import User
 from ..db.session import get_db
@@ -18,6 +19,11 @@ def _start_session(request: Request, user: User) -> None:
 
 @router.post("/register", response_model=UserOut, status_code=201)
 def register(payload: RegisterRequest, request: Request, db: Session = Depends(get_db)):
+    allowed = get_settings().allowed_email_set
+    if allowed and users_repo.normalize_email(payload.email) not in allowed:
+        raise HTTPException(
+            status_code=403, detail="Sign-up is invite only. Ask the owner to add your email."
+        )
     if users_repo.get_by_email(db, payload.email):
         raise HTTPException(status_code=409, detail="An account with this email already exists")
     user = users_repo.create(db, payload.email, payload.password)

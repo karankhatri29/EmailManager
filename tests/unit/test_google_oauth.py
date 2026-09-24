@@ -13,7 +13,7 @@ def test_authorization_url_requests_offline_access_with_pkce():
 
     assert url.startswith("https://accounts.google.com/")
     assert query["client_id"] == ["test-client-id"]
-    assert query["access_type"] == ["offline"] and query["prompt"] == ["consent"]
+    assert query["access_type"] == ["offline"] and query["prompt"] == ["select_account consent"]
     assert query["scope"] == ["https://www.googleapis.com/auth/gmail.readonly"]
     assert query["redirect_uri"] == ["http://localhost:8000/api/accounts/google/callback"]
     assert query["state"] == [state] and verifier
