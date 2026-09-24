@@ -125,6 +125,8 @@ def clean_summary_text(raw_text):
                 f"<div class='pl-2 text-slate-300 text-sm my-1 flex items-start gap-2'><span>&bull;</span><span>{item}</span></div>"
             )
         else:
-            blocks.append(f"<p class='text-slate-200 text-sm leading-relaxed mb-2'>{html.escape(stripped)}</p>")
+            blocks.append(
+                f"<p class='text-slate-200 text-sm leading-relaxed mb-2'>{html.escape(stripped)}</p>"
+            )
 
     return "".join(blocks)

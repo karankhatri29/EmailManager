@@ -11,8 +11,10 @@ from sqlalchemy.orm import Session
 from ..db.models import Activity, User, UserSettings
 from ..repositories import emails as emails_repo
 from ..repositories import followups as followups_repo
+from ..repositories import timetable as timetable_repo
 from . import ai_summarizer
 from .followups import waiting_days
+from .timetable import time_range
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +150,10 @@ def build_briefing(db: Session, user: User, settings: UserSettings, now: datetim
             ],
             "highlights": _promo_highlights([e.subject for e in promos[:PROMO_SUBJECTS_FOR_AI]]),
         },
+        "classes": [
+            {"title": s.title, "time": time_range(s), "room": s.room}
+            for s in timetable_repo.slots_on(db, user.id, today)
+        ],
         "waiting": [
             {"id": f.id, "recipient": f.recipient, "subject": f.subject, "days": waiting_days(f, now)}
             for f in waiting[:MAX_LIST]
@@ -168,6 +174,7 @@ def is_empty(briefing: dict) -> bool:
         or briefing["top_emails"]
         or briefing["promotions"]["count"]
         or briefing["waiting"]
+        or briefing["classes"]
     )
 
 
@@ -184,6 +191,10 @@ def render_text(b: dict) -> str:
     out = [f"{b['greeting']}! Here is your briefing for {b['date']}.", ""]
     sections = [
         ("Overdue", [_line(i) for i in b["overdue"]]),
+        (
+            "Classes today",
+            [f"{c['time']}  {c['title']}" + (f" ({c['room']})" if c["room"] else "") for c in b["classes"]],
+        ),
         ("Due today", [_line(i) for i in b["today"]]),
         ("Coming up", [f"{i['due']}: {_line(i)}" for i in b["upcoming"]]),
         ("Needs your attention", [f"{e['subject']} — {e['sender']}" for e in b["top_emails"]]),
@@ -226,6 +237,13 @@ def render_html(b: dict) -> str:
     body = "".join(
         [
             section("Overdue", [when(i) for i in b["overdue"]]),
+            section(
+                "Classes today",
+                [
+                    f"{e(c['time'])} {e(c['title'])}" + (f" ({e(c['room'])})" if c["room"] else "")
+                    for c in b["classes"]
+                ],
+            ),
             section("Due today", [when(i) for i in b["today"]]),
             section("Coming up", [f"{e(i['due'])}: {when(i)}" for i in b["upcoming"]]),
             section(

@@ -99,6 +99,7 @@ def test_briefing_endpoint_shape(auth_client):
         "top_emails",
         "promotions",
         "waiting",
+        "classes",
         "counts",
     }
     assert [i["title"] for i in body["today"]] == ["Pay rent"]

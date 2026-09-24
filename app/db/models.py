@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -10,6 +10,7 @@ from sqlalchemy import (
     LargeBinary,
     String,
     Text,
+    Time,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -108,6 +109,8 @@ class Activity(Base):
     all_day: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(16), default="todo")  # 'todo' | 'done'
     source: Mapped[str] = mapped_column(String(16), default="manual")  # 'email' | 'manual'
+    priority: Mapped[int] = mapped_column(Integer, default=2, server_default="2")  # 1 low, 2 normal, 3 high
+    course: Mapped[str | None] = mapped_column(String(120), nullable=True)  # which course a to-do belongs to
     remind_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -183,4 +186,27 @@ class ThreadSummary(Base):
     thread_key: Mapped[str] = mapped_column(String(160))  # "<account_id>:<provider thread id>"
     message_count: Mapped[int] = mapped_column(Integer)
     summary: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class ClassSlot(Base):
+    """One weekly meeting of a class in a student's timetable (a course with three lectures a week is three slots)."""
+
+    __tablename__ = "class_slots"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(120))
+    code: Mapped[str | None] = mapped_column(String(32), nullable=True)  # e.g. CSE1001
+    weekday: Mapped[int] = mapped_column(Integer)  # 0 = Monday ... 6 = Sunday
+    start_time: Mapped[time] = mapped_column(Time)  # local wall-clock time, in the user's own time zone
+    end_time: Mapped[time] = mapped_column(Time)
+    room: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    instructor: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    color: Mapped[str] = mapped_column(String(7), default="#3b82f6", server_default="#3b82f6")
+    term_start: Mapped[date | None] = mapped_column(
+        Date, nullable=True
+    )  # first day of the semester, if known
+    term_end: Mapped[date | None] = mapped_column(Date, nullable=True)  # last day of the semester, if known
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

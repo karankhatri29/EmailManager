@@ -51,7 +51,7 @@ def update_activity(
     changes = payload.model_dump(exclude_unset=True)
     if "remind_at" in changes:
         changes["reminded_at"] = None  # a changed reminder time fires again
-    for required in ("title", "status", "all_day"):
+    for required in ("title", "status", "all_day", "priority"):
         if required in changes and changes[required] is None:
             raise HTTPException(status_code=422, detail=f"{required} cannot be null")
 

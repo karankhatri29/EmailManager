@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import ColumnElement, and_, or_, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy import delete as sql_delete
 from sqlalchemy import update as sql_update
 from sqlalchemy.orm import Session
@@ -90,3 +90,24 @@ def set_status_for_email(db: Session, email_id: str, status: str) -> None:
     """Marks the calendar item created from an email as done / open again."""
     db.execute(sql_update(Activity).where(Activity.email_id == email_id).values(status=status))
     db.commit()
+
+
+def list_todos(
+    db: Session, user_id: int, status: str = "open", course: str | None = None, limit: int = 500
+) -> list[Activity]:
+    """To-dos for the list view. Open ones: due date first (undated last), then priority. Others: newest first."""
+    query = select(Activity).where(Activity.user_id == user_id)
+    if status == "open":
+        query = query.where(Activity.status != "done")
+    elif status == "done":
+        query = query.where(Activity.status == "done")
+    if course:
+        query = query.where(func.lower(Activity.course) == course.lower())
+
+    if status == "open":
+        query = query.order_by(
+            Activity.start_at.is_(None), Activity.start_at, Activity.priority.desc(), Activity.id
+        )
+    else:
+        query = query.order_by(Activity.updated_at.desc(), Activity.id.desc())
+    return list(db.scalars(query.limit(limit)))

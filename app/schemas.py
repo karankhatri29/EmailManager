@@ -1,7 +1,15 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from .services.textify import normalize_body, strip_symbols
 
@@ -221,6 +229,8 @@ class ActivityOut(BaseModel):
     email_id: str | None = None
     remind_at: datetime | None = None
     reminded_at: datetime | None = None
+    priority: int = 2
+    course: str | None = None
 
     @field_validator("start_at", "end_at", "remind_at", "reminded_at")
     @classmethod
@@ -235,6 +245,8 @@ class ActivityCreate(BaseModel):
     end_at: datetime | None = None
     all_day: bool = False
     remind_at: datetime | None = None
+    priority: int = Field(default=2, ge=1, le=3)
+    course: str | None = Field(default=None, max_length=120)
 
     @field_validator("start_at", "end_at", "remind_at")
     @classmethod
@@ -260,6 +272,8 @@ class ActivityUpdate(BaseModel):
     all_day: bool | None = None
     status: Literal["todo", "done"] | None = None
     remind_at: datetime | None = None  # null clears the reminder
+    priority: int | None = Field(default=None, ge=1, le=3)
+    course: str | None = Field(default=None, max_length=120)  # null removes the course
 
     @field_validator("start_at", "end_at", "remind_at")
     @classmethod
@@ -351,6 +365,7 @@ class BriefingOut(BaseModel):
     top_emails: list[dict[str, Any]]
     promotions: dict[str, Any]
     waiting: list[dict[str, Any]]
+    classes: list[dict[str, Any]] = []
     counts: dict[str, int]
 
 
@@ -403,3 +418,106 @@ class FollowUpOut(BaseModel):
 
 class SnoozeRequest(BaseModel):
     days: int = Field(ge=1, le=30)
+
+
+# --- timetable ---------------------------------------------------------------------------------
+
+COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
+
+
+def _clean(value: str | None) -> str | None:
+    value = (value or "").strip()
+    return value or None
+
+
+class ClassSlotCreate(BaseModel):
+    """A class and the weekdays it meets on; one slot is created per weekday."""
+
+    title: str = Field(min_length=1, max_length=120)
+    code: str | None = Field(default=None, max_length=32)
+    weekdays: list[int] = Field(min_length=1, max_length=7)  # 0 = Monday ... 6 = Sunday
+    start_time: time
+    end_time: time
+    room: str | None = Field(default=None, max_length=80)
+    instructor: str | None = Field(default=None, max_length=120)
+    color: str | None = Field(default=None, pattern=COLOR_PATTERN)
+    term_start: date | None = None
+    term_end: date | None = None
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("title")
+    @classmethod
+    def _title(cls, value):
+        value = value.strip()
+        if not value:
+            raise ValueError("title must not be blank")
+        return value
+
+    @field_validator("code", "room", "instructor", "notes")
+    @classmethod
+    def _blank_is_none(cls, value):
+        return _clean(value)
+
+    @field_validator("weekdays")
+    @classmethod
+    def _weekdays(cls, value):
+        if any(d < 0 or d > 6 for d in value):
+            raise ValueError("weekdays must be 0 (Monday) to 6 (Sunday)")
+        return sorted(set(value))
+
+    @model_validator(mode="after")
+    def _check(self):
+        if self.end_time <= self.start_time:
+            raise ValueError("the class must end after it starts")
+        if self.term_start and self.term_end and self.term_end < self.term_start:
+            raise ValueError("term_end must not be before term_start")
+        return self
+
+
+class ClassSlotUpdate(BaseModel):
+    """Partial update of one meeting. Only the fields sent change."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=120)
+    code: str | None = Field(default=None, max_length=32)
+    weekday: int | None = Field(default=None, ge=0, le=6)
+    start_time: time | None = None
+    end_time: time | None = None
+    room: str | None = Field(default=None, max_length=80)
+    instructor: str | None = Field(default=None, max_length=120)
+    color: str | None = Field(default=None, pattern=COLOR_PATTERN)
+    term_start: date | None = None
+    term_end: date | None = None
+    notes: str | None = Field(default=None, max_length=2000)
+    # Also apply title, code, colour, instructor and term dates to every other meeting of the same course.
+    apply_to_course: bool = False
+
+    @field_validator("title")
+    @classmethod
+    def _title(cls, value):
+        return value.strip() if value is not None else value
+
+    @field_validator("code", "room", "instructor", "notes")
+    @classmethod
+    def _blank_is_none(cls, value):
+        return _clean(value)
+
+
+class ClassSlotOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    code: str | None = None
+    weekday: int
+    start_time: time
+    end_time: time
+    room: str | None = None
+    instructor: str | None = None
+    color: str
+    term_start: date | None = None
+    term_end: date | None = None
+    notes: str | None = None
+
+    @field_serializer("start_time", "end_time")
+    def _hhmm(self, value: time) -> str:
+        return value.strftime("%H:%M")

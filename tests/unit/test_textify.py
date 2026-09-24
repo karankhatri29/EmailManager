@@ -35,15 +35,22 @@ def test_a_real_html_email_becomes_clean_readable_text():
 
     assert "<" not in text and ">" not in text and "style=" not in text and "&nbsp;" not in text
     assert "Email Subject Line" not in text  # HTML comments are not part of the message
-    assert "storage.example.com" not in text and "mail.example.com" not in text  # no image URLs or tracking pixel
+    assert (
+        "storage.example.com" not in text and "mail.example.com" not in text
+    )  # no image URLs or tracking pixel
     lines = text.split("\n")
     assert lines[0] == "Placement Drive Invitation"
     assert "Dear Karan Kaushik Khatri," in lines
     assert "Drive Details:" in lines
     # table rows stay together as "label value" lines
-    assert "Drive Name: LTM" in lines and "Drive Number: pat-PL-2026-1348" in lines and "Company: LTM" in lines
+    assert (
+        "Drive Name: LTM" in lines and "Drive Number: pat-PL-2026-1348" in lines and "Company: LTM" in lines
+    )
     assert "Date:" in lines
-    assert "Please log in to your placement portal to confirm your participation and view additional details about the drive." in lines
+    assert (
+        "Please log in to your placement portal to confirm your participation and view additional details about the drive."
+        in lines
+    )
     assert lines[-1] == "Powered by neoPAT • A product of Iamneo"
     assert "\n\n\n" not in text  # never more than one blank line in a row
 
@@ -85,7 +92,9 @@ def test_html_elements(markup, expected):
 
 
 def test_scripts_styles_and_hidden_head_content_never_leak():
-    text = normalize_body("<html><head><style>.a{}</style><title>T</title></head><body><script>var x = 1;</script>Hello</body></html>")
+    text = normalize_body(
+        "<html><head><style>.a{}</style><title>T</title></head><body><script>var x = 1;</script>Hello</body></html>"
+    )
     assert text == "Hello"
 
 
@@ -95,13 +104,21 @@ def test_invisible_padding_characters_are_removed():
 
 
 def test_broken_markup_does_not_crash():
-    for broken in ("<div><p>unclosed", "<<<>>>", "<div class='x", "text </b></i> stray closers", "<p>a</p></div></div>"):
+    for broken in (
+        "<div><p>unclosed",
+        "<<<>>>",
+        "<div class='x",
+        "text </b></i> stray closers",
+        "<p>a</p></div></div>",
+    ):
         assert isinstance(normalize_body(broken + "<br>"), str)
     assert normalize_body("<div><p>unclosed") == "unclosed"
 
 
 def test_the_length_limit_applies_after_conversion():
-    markup = "<div style='" + "x" * 5000 + "'>real content</div>"  # thousands of characters of markup, 12 of text
+    markup = (
+        "<div style='" + "x" * 5000 + "'>real content</div>"
+    )  # thousands of characters of markup, 12 of text
     assert normalize_body(markup, 4000) == "real content"
     assert len(normalize_body("word " * 2000, 100)) == 100
 

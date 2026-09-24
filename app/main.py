@@ -6,7 +6,19 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from .api import account_tools, accounts, activities, auth, calendar, inbox, mail, routes, rules
+from .api import (
+    account_tools,
+    accounts,
+    activities,
+    auth,
+    calendar,
+    inbox,
+    mail,
+    routes,
+    rules,
+    timetable,
+    todos,
+)
 from .core.config import get_settings
 from .core.logging import configure_logging
 from .services.background import start_periodic_jobs, start_periodic_sync
@@ -47,7 +59,19 @@ def create_app() -> FastAPI:
         https_only=settings.session_https_only,
     )
     app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
-    for module in (routes, auth, accounts, inbox, mail, rules, account_tools, activities, calendar):
+    for module in (
+        routes,
+        auth,
+        accounts,
+        inbox,
+        mail,
+        rules,
+        account_tools,
+        activities,
+        todos,
+        timetable,
+        calendar,
+    ):
         app.include_router(module.router)
     return app
 

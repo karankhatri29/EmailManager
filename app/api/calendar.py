@@ -5,6 +5,8 @@ from ..core.config import get_settings
 from ..db.models import User
 from ..db.session import get_db
 from ..repositories import activities as activities_repo
+from ..repositories import settings as settings_repo
+from ..repositories import timetable as timetable_repo
 from ..repositories import users as users_repo
 from ..schemas import CalendarFeedOut
 from ..services.ics import build_calendar
@@ -36,7 +38,10 @@ def calendar_feed(token: str, db: Session = Depends(get_db)):
     user = users_repo.get_by_calendar_token(db, token)
     if user is None:
         raise HTTPException(status_code=404, detail="Not found")
-    body = build_calendar(activities_repo.list_scheduled_open(db, user.id))
+    tzname = settings_repo.get_or_create(db, user.id).timezone
+    body = build_calendar(
+        activities_repo.list_scheduled_open(db, user.id), timetable_repo.list_for_user(db, user.id), tzname
+    )
     return Response(
         content=body, media_type="text/calendar; charset=utf-8", headers={"Cache-Control": "no-store"}
     )

@@ -10,14 +10,52 @@ from html.parser import HTMLParser
 
 # Elements that start and end a line of text.
 _BLOCK = frozenset(
-    "address article aside blockquote body dd details div dl dt fieldset figcaption figure footer form "
-    "h1 h2 h3 h4 h5 h6 header hr html li main nav ol p pre section summary table tbody tfoot thead tr ul".split()
+    [
+        "address",
+        "article",
+        "aside",
+        "blockquote",
+        "body",
+        "dd",
+        "details",
+        "div",
+        "dl",
+        "dt",
+        "fieldset",
+        "figcaption",
+        "figure",
+        "footer",
+        "form",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "header",
+        "hr",
+        "html",
+        "li",
+        "main",
+        "nav",
+        "ol",
+        "p",
+        "pre",
+        "section",
+        "summary",
+        "table",
+        "tbody",
+        "tfoot",
+        "thead",
+        "tr",
+        "ul",
+    ]
 )
 # Elements whose content is never part of the message.
-_SKIP = frozenset("script style head title noscript template svg object iframe".split())
+_SKIP = frozenset(["script", "style", "head", "title", "noscript", "template", "svg", "object", "iframe"])
 _CELLS = frozenset({"td", "th"})
 # Elements set apart by a blank line; other block elements (div, tr, ...) only start a new line.
-_PARAGRAPH = frozenset("p h1 h2 h3 h4 h5 h6 blockquote pre table ul ol".split())
+_PARAGRAPH = frozenset(["p", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "pre", "table", "ul", "ol"])
 
 # Anything that is clearly HTML. Only real tag names count, so "<me@x.com>" or "1 < 2" stay plain text.
 _HTML_HINT = re.compile(
@@ -31,10 +69,14 @@ _HTML_HINT = re.compile(
 # blocks (</td></tr><tr><td>, </div><div>) produce one line break, not a blank line.
 _SOFT = chr(1)  # start a new line
 _PARA = chr(2)  # leave a blank line
-_BREAKS = re.compile("(?:[ " + chr(9) + "]*[" + _SOFT + _PARA + chr(10) + "][ " + chr(9) + "]*)+")  # breaks with the spaces around them
+_BREAKS = re.compile(
+    "(?:[ " + chr(9) + "]*[" + _SOFT + _PARA + chr(10) + "][ " + chr(9) + "]*)+"
+)  # breaks with the spaces around them
 
 # Invisible padding that marketing email pads its preview text with.
-_INVISIBLE = re.compile("[" + "".join(chr(c) for c in (0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF, 0x034F, 0x00AD)) + "]")
+_INVISIBLE = re.compile(
+    "[" + "".join(chr(c) for c in (0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF, 0x034F, 0x00AD)) + "]"
+)
 
 
 def looks_like_html(text: str) -> bool:
