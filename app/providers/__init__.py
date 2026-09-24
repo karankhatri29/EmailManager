@@ -2,12 +2,13 @@ from ..core.security import decrypt
 from ..db.models import MailAccount
 from .base import MailProvider, ProviderAuthError
 from .gmail import GmailProvider
+from .microsoft import MicrosoftProvider
 
-__all__ = ["MailProvider", "ProviderAuthError", "get_provider"]
+__all__ = ["PROVIDERS", "MailProvider", "ProviderAuthError", "get_provider"]
 
 PROVIDERS = {
     "google": GmailProvider,
-    # "microsoft": GraphProvider,  # Outlook / Microsoft 365 (planned)
+    "microsoft": MicrosoftProvider,  # Outlook / Microsoft 365 (Graph API)
     # "imap": ImapProvider,        # Yahoo, iCloud, custom domains (planned)
 }
 

@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+MICROSOFT_SCOPES = ["offline_access", "User.Read", "Mail.Read"]
 
 Timeframe = Literal["Last 1 Day", "Last 1 Week", "Last 1 Month"]
 DEFAULT_TIMEFRAME: Timeframe = "Last 1 Day"
@@ -47,6 +48,13 @@ class Settings(BaseSettings):
     google_redirect_uri: str = "http://localhost:8000/api/accounts/google/callback"
     google_credentials_path: Path = BASE_DIR / "credentials.json"
 
+    # Microsoft (Outlook / Microsoft 365) app registration used by "Connect Outlook"
+    # (Azure portal -> App registrations). "common" allows work, school and personal accounts.
+    microsoft_client_id: str = ""
+    microsoft_client_secret: str = ""
+    microsoft_tenant: str = "common"
+    microsoft_redirect_uri: str = "http://localhost:8000/api/accounts/microsoft/callback"
+
     sync_interval_seconds: int = 300
     sync_max_workers: int = 4  # mailboxes synced concurrently
     # Run the periodic sync inside the API process (local dev without Redis).
@@ -67,6 +75,10 @@ class Settings(BaseSettings):
             "Google OAuth client not configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, "
             "or provide credentials.json."
         )
+
+    @property
+    def microsoft_configured(self) -> bool:
+        return bool(self.microsoft_client_id and self.microsoft_client_secret)
 
 
 @lru_cache

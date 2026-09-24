@@ -10,6 +10,8 @@ os.environ.update(
     ENCRYPTION_KEY=Fernet.generate_key().decode(),
     GOOGLE_CLIENT_ID="test-client-id",
     GOOGLE_CLIENT_SECRET="test-client-secret",
+    MICROSOFT_CLIENT_ID="test-ms-client-id",
+    MICROSOFT_CLIENT_SECRET="test-ms-client-secret",
     PUBLIC_BASE_URL="http://testserver",
 )
 

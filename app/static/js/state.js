@@ -10,6 +10,7 @@ export const CATEGORY_COLORS = {
 export const state = {
     user: null,
     accounts: [],
+    accountFilter: null, // null = every mailbox, otherwise one account id
     emails: [],
     activities: [],
     selectedEmailId: null,

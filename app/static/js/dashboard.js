@@ -1,15 +1,23 @@
 import { api } from './api.js';
 import { CATEGORY_COLORS, state } from './state.js';
+import { providerLabel } from './accounts.js';
 import { $, esc, senderName } from './util.js';
 
 const URGENT = 'Urgent / Action Required';
+
+// Query parameters shared by every inbox request: the timeframe, and the mailbox filter if one is set.
+const inboxParams = (extra = {}) => ({
+    time_filter: state.timeframe,
+    ...(state.accountFilter !== null ? { account_id: state.accountFilter } : {}),
+    ...extra,
+});
 
 // --- data ----------------------------------------------------------------------------------------
 
 // Reads stored emails (instant). refresh asks the server to start a background sync of every mailbox.
 // silent = background poll: skip the re-render unless something actually changed.
 export async function loadEmails({ refresh = false, silent = false } = {}) {
-    const emails = await api('/api/emails', { params: { time_filter: state.timeframe, refresh } });
+    const emails = await api('/api/emails', { params: inboxParams({ refresh }) });
     const changed = JSON.stringify(emails) !== JSON.stringify(state.emails);
     if (changed || !silent) {
         state.emails = emails;
@@ -33,7 +41,7 @@ async function renderTasks() {
     const list = $('taskList');
     let tasks = [];
     try {
-        tasks = await api('/api/scheduler', { params: { time_filter: state.timeframe } });
+        tasks = await api('/api/scheduler', { params: inboxParams() });
     } catch (err) {
         list.innerHTML = `<div class="p-4 text-xs text-red-400 text-center">${esc(err.message)}</div>`;
         return;
@@ -47,8 +55,13 @@ async function renderTasks() {
         return;
     }
 
+    // Which mailbox a task came from only matters when there is more than one.
+    const accountOf = (emailId) => state.accounts.find((a) => a.id === Number(emailId.split(':')[0]));
+    const showMailbox = state.accounts.length > 1 && state.accountFilter === null;
+
     list.innerHTML = tasks.map((t) => {
         const hot = t.sort_tier <= 2;
+        const mailbox = showMailbox ? accountOf(t.id) : null;
         return `
         <div data-email="${esc(t.id)}" class="p-4 bg-slate-800/40 hover:bg-slate-700/50 rounded-xl cursor-pointer border border-slate-700/50 hover:border-blue-500/30 transition flex flex-col gap-2 group shadow-sm mb-2">
             <div class="flex justify-between items-center text-[11px]">
@@ -59,6 +72,7 @@ async function renderTasks() {
             <div class="flex items-center gap-1.5 text-xs pt-1 border-t border-slate-800/60">
                 <span class="text-slate-500">⏱️ Deadline:</span>
                 <span class="font-medium ${hot ? 'text-amber-400' : 'text-slate-400'}">${esc(t.deadline)}</span>
+                ${mailbox ? `<span class="ml-auto text-[10px] text-slate-500 truncate max-w-[50%]" title="${esc(mailbox.email_address)}">${esc(providerLabel(mailbox))} · ${esc(mailbox.email_address)}</span>` : ''}
             </div>
         </div>`;
     }).join('');
@@ -138,7 +152,7 @@ export function openEmailDrawer(emailId) {
         <div class="p-6 border-b border-slate-700/50 bg-slate-800/30 shrink-0">
             <h2 class="text-lg font-bold text-white leading-tight mb-2">${esc(email.subject)}</h2>
             <p class="text-slate-400 text-sm"><strong>From:</strong> ${esc(email.sender)}</p>
-            <p class="text-slate-500 text-xs mt-1">${esc(new Date(email.date).toLocaleString())}${account ? ` · ${esc(account.email_address)}` : ''}</p>
+            <p class="text-slate-500 text-xs mt-1">${esc(new Date(email.date).toLocaleString())}${account ? ` · ${esc(providerLabel(account))} · ${esc(account.email_address)}` : ''}</p>
             <div class="mt-3 flex items-center gap-2 text-[11px]">
                 <span class="px-2 py-0.5 rounded-full border border-slate-600/50 text-slate-300">${esc(email.category)}</span>
                 ${gmailLink ? `<a href="${esc(gmailLink)}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">Open in Gmail ↗</a>` : ''}

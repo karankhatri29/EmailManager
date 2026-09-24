@@ -26,11 +26,13 @@ def upsert_many(db: Session, emails: Iterable[dict]) -> None:
     db.commit()
 
 
-def list_in_window(db: Session, user_id: int, days: int) -> list[Email]:
-    """The user's emails newer than `days` days, most recent first."""
+def list_in_window(db: Session, user_id: int, days: int, account_id: int | None = None) -> list[Email]:
+    """The user's emails newer than `days` days, most recent first (optionally from one mailbox)."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    query = select(Email).where(Email.user_id == user_id, Email.date >= cutoff).order_by(Email.date.desc())
-    return list(db.scalars(query))
+    query = select(Email).where(Email.user_id == user_id, Email.date >= cutoff)
+    if account_id is not None:
+        query = query.where(Email.account_id == account_id)
+    return list(db.scalars(query.order_by(Email.date.desc())))
 
 
 def list_pending_summaries(db: Session, account_id: int) -> list[Email]:

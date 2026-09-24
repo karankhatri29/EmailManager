@@ -75,6 +75,16 @@ Create an OAuth client in Google Cloud Console (APIs & Services → Credentials)
 put the downloaded JSON at `./credentials.json` or set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. For a web
 client, register `<PUBLIC_BASE_URL>/api/accounts/google/callback` as an authorised redirect URI.
 
+### Outlook / Microsoft 365 setup (optional)
+Register an app in the Azure portal (Microsoft Entra ID → App registrations → New registration). Choose
+"Accounts in any organizational directory and personal Microsoft accounts", add the redirect URI
+`<PUBLIC_BASE_URL>/api/accounts/microsoft/callback` (platform: Web), add the delegated permissions `Mail.Read`,
+`User.Read` and `offline_access`, then create a client secret. Set `MICROSOFT_CLIENT_ID` and
+`MICROSOFT_CLIENT_SECRET`. Without them the **＋ Outlook** button shows a "not set up" message.
+
+A user can connect any mix of Gmail and Outlook mailboxes. With two or more connected, the dashboard shows a
+filter to view all of them together or one at a time (`?account_id=` on `/api/emails` and `/api/scheduler`).
+
 > **Before selling this:** Gmail read access is a *restricted* scope. Google requires app verification and an
 > annual security assessment before you can exceed 100 users; while the consent screen is in "Testing" mode,
 > refresh tokens expire after 7 days. Also plan for a privacy policy, consent for sending mail text to Gemini,

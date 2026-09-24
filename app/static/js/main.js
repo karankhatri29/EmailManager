@@ -95,9 +95,10 @@ function handleConnectResult() {
     if (!connected && !error) return;
 
     const messages = {
-        access_denied: 'Google access was not granted, so nothing was connected.',
+        access_denied: 'Access was not granted, so nothing was connected.',
         invalid_state: 'That sign-in link expired. Please try connecting again.',
         login_required: 'Please sign in first, then connect your mailbox.',
+        not_configured: 'Outlook is not set up on this server yet. An administrator needs to add the Microsoft app credentials.',
         failed: 'Could not finish connecting the mailbox. Please try again.',
     };
     if (connected) toast(`Connected ${connected}. Syncing your mail…`, 'success');
@@ -144,7 +145,10 @@ function toggleSidebar() {
 document.addEventListener('DOMContentLoaded', () => {
     setUnauthorizedHandler(showAuth);
     initAuth(startApp);
-    initAccounts(() => refreshEverything({ silent: false }));
+    initAccounts(
+        () => refreshEverything({ silent: false }),
+        () => loadEmails(), // the mailbox filter changed: re-read mail and tasks for it
+    );
     initDashboard();
     initActivity();
 
