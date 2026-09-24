@@ -37,3 +37,18 @@ def test_shell_applies_saved_settings_before_first_paint_and_has_the_settings_di
     for view in ("day", "week", "month"):
         assert f'data-cal-view="{view}"' in html
     assert 'data-cal-view="auto"' not in html
+
+
+def test_dashboard_has_its_kpi_widgets_and_a_settings_section_to_choose_them(client):
+    html = client.get("/").text
+    for element in (
+        'id="kpiGrid"',
+        'id="card-focus"',
+        'id="card-senders"',
+        'id="card-mailboxes"',
+        'id="card-busyHours"',
+        'id="dashPrefs"',
+    ):
+        assert element in html, element
+    assert client.get("/static/js/kpis.js").status_code == 200
+    assert client.get("/static/js/dashboard-catalog.js").status_code == 200

@@ -13,6 +13,8 @@ export const state = {
     accounts: [],
     accountFilter: null, // null = every mailbox, otherwise one account id
     emails: [],
+    tasks: [], // action items from /api/scheduler, most urgent first
+    dashActivities: null, // scheduled tasks around today for the dashboard numbers (null = could not load)
     activities: [],
     selectedEmailId: null,
     calAnchor: new Date(), // any date inside the range the calendar is showing (day / week / month)

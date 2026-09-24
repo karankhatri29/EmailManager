@@ -25,7 +25,8 @@
     --h-emerald: 158; --s-emerald: 72%;
     --h-amber: 38;    --s-amber: 96%;
     --h-violet: 270;  --s-violet: 90%;
-    --l-200: 86%; --l-300: 78%; --l-400: 70%; --l-500: 62%; --l-600: 56%; --l-700: 48%; --l-900: 20%;
+    --l-200: 86%; --l-300: 80%; --l-400: 74%; --l-500: 62%; --l-600: 56%; --l-700: 48%; --l-900: 20%;
+    --chip-l: 78%; /* lightness of chip text: light on dark surfaces, dark on light ones */
 
     --card-bg: rgb(var(--slate-800) / 0.66);
     --card-solid: rgb(var(--slate-900));
@@ -54,6 +55,7 @@
     --fg: 27 20 60;
 
     --l-200: 24%; --l-300: 29%; --l-400: 31%; --l-500: 56%; --l-600: 50%; --l-700: 42%; --l-900: 94%;
+    --chip-l: 28%;
 
     --card-bg: rgb(255 255 255 / 0.78);
     --card-solid: #ffffff;
@@ -208,10 +210,26 @@ button.rounded-lg { border-radius: 0.95rem; }
     transition: transform .2s ease;
 }
 .stat-tile:hover { transform: translateY(-3px) rotate(-0.4deg); }
-.stat-urgent { --tile-h: 350; }
-.stat-good { --tile-h: 158; }
+/* Threshold colours: bad / due soon / upcoming / fine / neutral. Reused by tiles, chips and dots. */
+.tone-brand   { --tile-h: var(--brand-h); }
+.tone-urgent  { --tile-h: 350; }
+.tone-warn    { --tile-h: 28; }
+.tone-info    { --tile-h: 205; }
+.tone-good    { --tile-h: 158; }
+.tone-neutral { --tile-h: 262; }
 .stat-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: rgb(var(--slate-300)); }
 .stat-num { font-size: clamp(1.7rem, 6vw, 2.6rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.04em; color: rgb(var(--fg)); margin-top: 0.15rem; }
+.stat-tile { min-height: 6.4rem; }
+.stat-tile:focus-visible { outline-offset: 3px; }
+.stat-sub { font-size: 0.72rem; font-weight: 500; color: rgb(var(--slate-300)); margin-top: 0.2rem; line-height: 1.25; }
+.stat-icon { position: absolute; right: 0.75rem; top: 0.7rem; color: hsl(var(--tile-h) 88% var(--chip-l)); opacity: 0.95; }
+.chip { display: inline-flex; align-items: center; padding: 0.15rem 0.6rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; line-height: 1.3; color: hsl(var(--tile-h) 88% var(--chip-l)); background: hsl(var(--tile-h) 92% 60% / 0.16); border: 1px solid hsl(var(--tile-h) 90% 60% / 0.28); }
+.dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: hsl(var(--tile-h) 90% 58%); }
+.focus-card { border-left: 4px solid hsl(var(--tile-h) 90% 58%); background: linear-gradient(100deg, hsl(var(--tile-h) 92% 60% / 0.14), transparent 55%), var(--card-bg); }
+.focus-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; flex-shrink: 0; border-radius: 1rem; color: hsl(var(--tile-h) 88% var(--chip-l)); background: hsl(var(--tile-h) 92% 60% / 0.18); }
+.pref-row { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.55rem 0.25rem; border-radius: 0.75rem; cursor: pointer; }
+.pref-row:hover { background: rgb(var(--slate-700) / 0.4); }
+.pref-row input { width: 1.1rem; height: 1.1rem; margin-top: 0.15rem; flex-shrink: 0; accent-color: hsl(var(--brand-h) 92% 58%); cursor: pointer; }
 .stat-emoji { position: absolute; right: 0.6rem; top: 0.4rem; font-size: 1.6rem; opacity: 0.9; filter: drop-shadow(0 4px 8px rgb(0 0 0 / 0.25)); }
 
 /* ---- Settings UI ------------------------------------------------------------------------------------- */

@@ -1,10 +1,11 @@
 // Entry point: sign-in gate, tabs, sync polling. Each view lives in its own module.
 
 import { loadActivities, initActivity } from './activity.js';
-import { initAccounts, loadAccounts } from './accounts.js';
+import { initAccounts, loadAccounts, renderAccountFilter } from './accounts.js';
 import { setUnauthorizedHandler, api } from './api.js';
 import { initAuth, logout } from './auth.js';
-import { initDashboard, loadEmails, renderCharts } from './dashboard.js';
+import { initDashboard, loadEmails, openEmailDrawer, renderCharts } from './dashboard.js';
+import { initKpis } from './kpis.js';
 import { getPrefs, initSettings } from './settings.js';
 import { state } from './state.js';
 import { $, show, toast } from './util.js';
@@ -161,6 +162,16 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     initDashboard();
     initActivity();
+    initKpis({
+        openEmail: openEmailDrawer,
+        goActivity: () => switchTab('activity'),
+        refreshActivities: loadActivities,
+        filterAccount: async (id) => { // clicking a mailbox in the breakdown shows just that mailbox
+            state.accountFilter = id;
+            renderAccountFilter();
+            await loadEmails();
+        },
+    });
 
     // Settings (theme, accent, ...) are applied when settings.js loads; here we wire the dialog and the
     // saved default timeframe.

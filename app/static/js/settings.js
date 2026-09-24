@@ -1,9 +1,10 @@
-// App settings: theme (follows the device unless overridden), accent colour, text size, motion and the
-// default timeframe. They live in this browser's localStorage (per device, no account needed).
+// App settings: theme (follows the device unless overridden), accent colour, text size, motion, the
+// default timeframe and which numbers / widgets the dashboard shows. They live in this browser's localStorage (per device, no account needed).
 //
 // The inline script in index.html applies the saved settings before first paint (no flash of the wrong
 // theme); this module keeps them in sync afterwards and powers the Settings dialog.
 
+import { KPI_CATALOG, WIDGET_CATALOG, defaultIds } from './dashboard-catalog.js';
 import { CATEGORY_COLORS } from './state.js';
 import { $, show } from './util.js';
 
@@ -33,7 +34,7 @@ const CATEGORY_VARS = {
 };
 
 const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
-let prefs = { ...DEFAULTS };
+let prefs = { ...DEFAULTS, kpis: defaultIds(KPI_CATALOG), widgets: defaultIds(WIDGET_CATALOG) };
 let onTimeframe = () => {};
 
 // --- storage ---------------------------------------------------------------------------------------
@@ -44,6 +45,10 @@ function load() {
         for (const [key, allowed] of Object.entries(OPTIONS)) {
             if (allowed.includes(saved[key])) prefs[key] = saved[key];
         }
+        // dashboard switches: keep only ids that still exist, in catalog order
+        const keep = (catalog, ids) => catalog.filter((item) => ids.includes(item.id)).map((item) => item.id);
+        if (Array.isArray(saved.kpis)) prefs.kpis = keep(KPI_CATALOG, saved.kpis);
+        if (Array.isArray(saved.widgets)) prefs.widgets = keep(WIDGET_CATALOG, saved.widgets);
     } catch {
         // storage blocked or corrupted: fall back to the defaults
     }
@@ -58,6 +63,7 @@ function save() {
 }
 
 export const getPrefs = () => ({ ...prefs });
+export const getDashPrefs = () => ({ kpis: [...prefs.kpis], widgets: [...prefs.widgets] });
 
 // --- applying --------------------------------------------------------------------------------------
 
@@ -97,6 +103,48 @@ function setPref(key, value) {
     if (key === 'timeframe') onTimeframe(value);
 }
 
+// --- dashboard switches ----------------------------------------------------------------------------
+
+function setDashItem(kind, id, on) {
+    const [key, catalog] = kind === 'kpi' ? ['kpis', KPI_CATALOG] : ['widgets', WIDGET_CATALOG];
+    const next = new Set(prefs[key]);
+    if (on) next.add(id); else next.delete(id);
+    prefs[key] = catalog.filter((item) => next.has(item.id)).map((item) => item.id);
+    save();
+    syncDashPrefs();
+    document.dispatchEvent(new CustomEvent('dashchange'));
+}
+
+function dashGroup(title, kind, catalog, selected) {
+    const rows = catalog.map((item) => `
+        <label class="pref-row">
+            <input type="checkbox" data-dash="${kind}" data-id="${item.id}" ${selected.includes(item.id) ? 'checked' : ''}>
+            <span><span class="block text-sm font-semibold text-fg">${item.label}</span>
+            <span class="block text-xs text-slate-400">${item.hint}</span></span>
+        </label>`).join('');
+    return `<div><p class="text-sm font-bold text-fg mb-1">${title}</p>${rows}</div>`;
+}
+
+function buildDashPrefs() {
+    const host = $('dashPrefs');
+    if (!host) return;
+    host.innerHTML = dashGroup('Key numbers', 'kpi', KPI_CATALOG, prefs.kpis)
+        + dashGroup('Widgets', 'widget', WIDGET_CATALOG, prefs.widgets);
+    syncDashPrefs();
+}
+
+function syncDashPrefs() {
+    document.querySelectorAll('[data-dash]').forEach((box) => {
+        const list = box.dataset.dash === 'kpi' ? prefs.kpis : prefs.widgets;
+        box.checked = list.includes(box.dataset.id);
+    });
+    const note = $('kpiCount');
+    if (note) {
+        const n = prefs.kpis.length;
+        note.textContent = n > 9 ? `${n} numbers is a lot. 5 to 9 is easiest to take in at a glance.` : `${n} key number${n === 1 ? '' : 's'} shown.`;
+    }
+}
+
 // --- dialog ----------------------------------------------------------------------------------------
 
 function syncControls() {
@@ -126,6 +174,12 @@ function closeSettings() {
 export function initSettings({ onTimeframeChange } = {}) {
     if (onTimeframeChange) onTimeframe = onTimeframeChange;
 
+    buildDashPrefs();
+    document.addEventListener('change', (event) => {
+        const box = event.target.closest('[data-dash]');
+        if (box) setDashItem(box.dataset.dash, box.dataset.id, box.checked);
+    });
+
     document.addEventListener('click', (event) => {
         if (event.target.closest('[data-open-settings]')) return openSettings();
         const choice = event.target.closest('[data-pref]');
@@ -142,10 +196,12 @@ export function initSettings({ onTimeframeChange } = {}) {
     document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeSettings(); });
     $('settingsReset').addEventListener('click', () => {
         const keepTimeframe = prefs.timeframe;
-        prefs = { ...DEFAULTS, timeframe: keepTimeframe };
+        prefs = { ...DEFAULTS, timeframe: keepTimeframe, kpis: defaultIds(KPI_CATALOG), widgets: defaultIds(WIDGET_CATALOG) };
         save();
         apply();
         syncControls();
+        syncDashPrefs();
+        document.dispatchEvent(new CustomEvent('dashchange'));
     });
 
     // Follow the device live while the preference is "system".

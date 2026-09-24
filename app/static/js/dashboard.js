@@ -1,6 +1,7 @@
 import { api } from './api.js';
 import { CATEGORY_COLORS, state } from './state.js';
 import { providerLabel } from './accounts.js';
+import { loadDashActivities, renderAll, widgetOn } from './kpis.js';
 import { cssVar } from './settings.js';
 import { $, esc, senderName } from './util.js';
 
@@ -36,26 +37,49 @@ function firstName() {
     return word ? word.charAt(0).toUpperCase() + word.slice(1) : '';
 }
 
-function renderHero(total, urgent) {
+// The five-second answer: what is on fire today?
+function renderHero(m) {
     const name = firstName();
-    $('heroTitle').textContent = name ? `Hey ${name} 👋` : 'Hey 👋';
+    $('heroTitle').textContent = name ? `Hey ${name}` : 'Hey there';
+
+    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    const parts = [];
+    if (m.tasks && m.overdue.length) parts.push(`${m.overdue.length} overdue`);
+    if (m.tasks && m.dueToday.length) parts.push(`${m.dueToday.length} due today`);
+    if (m.urgent) parts.push(plural(m.urgent, 'urgent email', 'urgent emails'));
+
     let line;
-    if (total === 0) line = state.accounts.length ? 'Nothing new in this window. Inbox zen 🧘' : 'Connect a mailbox and I will sort it out for you.';
-    else if (urgent > 0) line = `${urgent} ${urgent === 1 ? 'thing needs' : 'things need'} you first. You got this 💪`;
-    else line = 'Nothing urgent right now. Enjoy it 🌴';
+    if (!state.accounts.length) line = 'Connect a mailbox and I will sort it out for you.';
+    else if (parts.length) line = `You have ${parts.join(', ')}.`;
+    else if (m.total === 0) line = 'Nothing new in this window. Inbox zen.';
+    else line = 'All clear. Nothing urgent right now.';
     $('heroSub').textContent = line;
 }
 
 export async function renderDashboard() {
-    const urgent = state.emails.filter((e) => e.category === URGENT).length;
-    $('kpi-total').textContent = state.emails.length;
-    $('kpi-urgent').textContent = urgent;
-    $('kpi-important').textContent = state.emails.filter((e) => e.category === 'Important').length;
-    renderHero(state.emails.length, urgent);
+    await renderTasks(); // also stores state.tasks, which the "Do this first" card can use
+    await loadDashActivities();
+    renderHome();
+}
 
-    await renderTasks();
+// Everything on the home screen that is computed locally (used again when Settings switches change).
+function renderHome() {
+    const m = renderAll();
+    renderHero(m);
     renderCharts();
 }
+
+// Groups follow how the scheduler ranks tasks: a dated deadline, something soon, or no deadline at all.
+const TASK_GROUPS = [
+    { label: 'Deadline set', tone: 'warn', test: (t) => t.sort_tier <= 2 },
+    { label: 'Coming up', tone: 'info', test: (t) => t.sort_tier === 3 },
+    { label: 'No deadline', tone: 'neutral', test: (t) => t.sort_tier >= 4 },
+];
+
+const deadlineText = (t) => ({
+    'No Explicit Deadline Stated': 'No date',
+    'Immediate / End of Day Target': 'ASAP',
+}[t.deadline] || t.deadline);
 
 async function renderTasks() {
     const list = $('taskList');
@@ -63,13 +87,16 @@ async function renderTasks() {
     try {
         tasks = await api('/api/scheduler', { params: inboxParams() });
     } catch (err) {
+        state.tasks = [];
         list.innerHTML = `<div class="p-4 text-xs text-red-400 text-center">${esc(err.message)}</div>`;
         return;
     }
+    state.tasks = tasks;
+    $('taskCount').textContent = tasks.length;
 
     if (!tasks.length) {
         const message = state.accounts.length
-            ? 'Nothing needs action in this period. ✨'
+            ? 'Nothing needs action in this period.'
             : 'Connect a mailbox to see your action items.';
         list.innerHTML = `<div class="flex items-center justify-center h-full text-slate-500 text-sm p-4 text-center">${message}</div>`;
         return;
@@ -79,21 +106,31 @@ async function renderTasks() {
     const accountOf = (emailId) => state.accounts.find((a) => a.id === Number(emailId.split(':')[0]));
     const showMailbox = state.accounts.length > 1 && state.accountFilter === null;
 
-    list.innerHTML = tasks.map((t) => {
-        const hot = t.sort_tier <= 2;
+    const card = (t) => {
         const mailbox = showMailbox ? accountOf(t.id) : null;
+        const tone = t.sort_tier <= 2 ? 'warn' : t.sort_tier === 3 ? 'info' : 'neutral';
         return `
-        <div data-email="${esc(t.id)}" class="p-4 bg-slate-800/40 hover:bg-slate-700/50 rounded-xl cursor-pointer border border-slate-700/50 hover:border-blue-500/30 transition flex flex-col gap-2 group shadow-sm mb-2">
-            <div class="flex justify-between items-center text-[11px]">
-                <span class="font-bold text-slate-400 tracking-wide truncate max-w-[70%]">👤 ${esc(senderName(t.sender))}</span>
-                <span class="px-2 py-0.5 rounded-full font-mono text-[9px] ${hot ? 'bg-red-500/10 border border-red-500/20 text-red-400' : 'bg-slate-700/30 border border-slate-600/30 text-slate-400'}">Tier ${t.sort_tier}</span>
+        <div data-email="${esc(t.id)}" class="p-4 bg-slate-800/40 hover:bg-slate-700/50 rounded-2xl cursor-pointer border border-slate-700/50 hover:border-blue-500/30 transition flex flex-col gap-2 group">
+            <div class="flex items-start justify-between gap-2">
+                <p class="text-fg font-semibold text-sm leading-snug group-hover:text-blue-400 transition-colors">${esc(t.task)}</p>
+                <span class="chip tone-${tone} shrink-0">${esc(deadlineText(t))}</span>
             </div>
-            <p class="text-slate-100 font-semibold text-sm leading-snug group-hover:text-blue-400 transition-colors">⚡ ${esc(t.task)}</p>
-            <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs pt-1 border-t border-slate-800/60">
-                <span class="text-slate-500 whitespace-nowrap">⏱️ Deadline:</span>
-                <span class="font-medium ${hot ? 'text-amber-400' : 'text-slate-400'}">${esc(t.deadline)}</span>
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400">
+                <span class="truncate">${esc(senderName(t.sender))}</span>
                 ${mailbox ? `<span class="ml-auto text-[10px] text-slate-500 truncate max-w-[50%]" title="${esc(mailbox.email_address)}">${esc(providerLabel(mailbox))} · ${esc(mailbox.email_address)}</span>` : ''}
             </div>
+        </div>`;
+    };
+
+    list.innerHTML = TASK_GROUPS.map((group) => {
+        const items = tasks.filter(group.test);
+        if (!items.length) return '';
+        return `
+        <div class="space-y-2">
+            <p class="px-1 pt-2 flex items-center gap-2 text-[0.68rem] font-bold uppercase tracking-wider text-slate-400">
+                <span class="dot tone-${group.tone}"></span>${group.label}<span class="text-slate-500 font-semibold">${items.length}</span>
+            </p>
+            ${items.map(card).join('')}
         </div>`;
     }).join('');
 }
@@ -112,7 +149,7 @@ export function renderCharts() {
     // Pie: priority distribution
     const counts = {};
     state.emails.forEach((e) => { counts[e.category] = (counts[e.category] || 0) + 1; });
-    Plotly.newPlot('pieChart', [{
+    if (widgetOn('priorityMix')) Plotly.newPlot('pieChart', [{
         values: Object.values(counts),
         labels: Object.keys(counts),
         type: 'pie',
@@ -155,7 +192,7 @@ export function renderCharts() {
     const fits = Math.max(2, Math.floor($('lineChart').clientWidth / 56));
     const step = Math.ceil(keys.length / fits);
 
-    Plotly.newPlot('lineChart', traces, {
+    if (widgetOn('volume')) Plotly.newPlot('lineChart', traces, {
         ...layoutBase,
         margin: { t: 20, b: 40, l: 36, r: 12 },
         xaxis: { showgrid: false, tickmode: 'array', tickvals: keys.filter((_, i) => i % step === 0), tickangle: 0 },
@@ -220,4 +257,5 @@ export function initDashboard() {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeEmailDrawer(); });
     window.addEventListener('resize', renderCharts);
     document.addEventListener('themechange', renderCharts); // new theme, new chart colours
+    document.addEventListener('dashchange', renderHome); // Settings switched a number or widget on/off
 }

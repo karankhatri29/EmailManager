@@ -70,6 +70,17 @@ uvicorn app.main:app --reload                # http://localhost:8000  (API docs:
 
 The periodic sync runs inside the API process by default. Then: create an account, click **Connect Gmail**.
 
+### Dashboard and settings
+The home screen leads with a "Do this first" card, then key numbers (needs action, overdue, due today, next 7 days,
+on-time completion, emails received), priority and volume charts, top senders and a per-mailbox breakdown. Numbers
+are colour-coded by threshold (red overdue, orange due today, blue upcoming, green fine). Everything is computed in
+the browser from data the app already stores.
+
+**Settings** (gear icon, saved per device in the browser): theme (System / Light / Dark; System follows the
+device live), accent colour, text size, animations, default timeframe, and switches for every dashboard number
+and widget (10 numbers and 6 widgets to choose from). The calendar picks Day / Week / Month from the screen size,
+and the toolbar overrides it for the current visit.
+
 ### Google OAuth setup
 Create an OAuth client in Google Cloud Console (APIs & Services → Credentials), enable the Gmail API, and either
 put the downloaded JSON at `./credentials.json` or set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. For a web

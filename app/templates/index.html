@@ -171,11 +171,11 @@
 
             <!-- Command Center -->
             <div id="view-dashboard" class="flex-1 p-3 sm:p-6 flex flex-col xl:flex-row gap-4 xl:gap-6 overflow-y-auto xl:overflow-hidden min-h-0">
-                <div class="w-full xl:w-3/5 flex flex-col gap-4 xl:gap-6 min-w-0 xl:min-h-0">
+                <div class="w-full xl:w-3/5 flex flex-col gap-4 xl:gap-6 min-w-0 xl:min-h-0 xl:overflow-y-auto xl:pr-1">
 
                     <div id="hero">
-                        <h2 id="heroTitle" class="text-2xl sm:text-3xl font-extrabold tracking-tight text-fg">Hey 👋</h2>
-                        <p id="heroSub" class="text-sm text-slate-400 mt-1">Here's what's on your plate.</p>
+                        <h2 id="heroTitle" class="text-2xl sm:text-3xl font-extrabold tracking-tight text-fg">Hey there</h2>
+                        <p id="heroSub" class="text-sm text-slate-300 mt-1">Loading your day...</p>
                     </div>
 
                     <div id="connectPrompt" class="hidden glass-card p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -191,40 +191,45 @@
 
                     <div id="accountFilter" class="hidden flex-wrap items-center gap-2" role="group" aria-label="Filter by mailbox"></div>
 
-                    <div class="grid grid-cols-3 gap-2 sm:gap-4">
-                        <div class="stat-tile">
-                            <span class="stat-emoji" aria-hidden="true">📬</span>
-                            <p class="stat-label">Emails</p>
-                            <p class="stat-num" id="kpi-total">0</p>
-                        </div>
-                        <div class="stat-tile stat-urgent">
-                            <span class="stat-emoji" aria-hidden="true">🔥</span>
-                            <p class="stat-label">Action required</p>
-                            <p class="stat-num" id="kpi-urgent">0</p>
-                        </div>
-                        <div class="stat-tile stat-good">
-                            <span class="stat-emoji" aria-hidden="true">✨</span>
-                            <p class="stat-label">Important</p>
-                            <p class="stat-num" id="kpi-important">0</p>
-                        </div>
-                    </div>
+                    <div id="card-focus" class="glass-card"></div>
 
-                    <div class="flex flex-col md:flex-row gap-4 xl:gap-6 xl:flex-1 xl:min-h-0">
-                        <div class="glass-card p-4 flex-1 flex flex-col relative min-h-[260px]">
+                    <div id="kpiGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3"></div>
+
+                    <div id="chartRow" class="flex flex-col md:flex-row gap-4 xl:gap-6">
+                        <div id="card-priorityMix" class="glass-card p-4 flex-1 flex flex-col relative min-h-[260px]">
                             <p class="text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2">Priority mix</p>
                             <div class="relative flex-1 w-full"><div id="pieChart" class="absolute inset-0"></div></div>
                         </div>
-                        <div class="glass-card p-4 flex-1 flex flex-col relative min-h-[260px]">
+                        <div id="card-volume" class="glass-card p-4 flex-1 flex flex-col relative min-h-[260px]">
                             <p class="text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2">Volume timeline</p>
                             <div class="relative flex-1 w-full"><div id="lineChart" class="absolute inset-0"></div></div>
                         </div>
+                    </div>
+
+                    <div id="insightRow" class="grid grid-cols-1 md:grid-cols-2 gap-4 xl:gap-6">
+                        <div id="card-senders" class="glass-card p-4">
+                            <p class="text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-1">Top senders</p>
+                            <div id="sendersList"></div>
+                        </div>
+                        <div id="card-mailboxes" class="glass-card p-4 hidden">
+                            <p class="text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-1">Mailboxes</p>
+                            <div id="mailboxList"></div>
+                        </div>
+                    </div>
+
+                    <div id="card-busyHours" class="glass-card p-4 hidden flex-col min-h-[240px]">
+                        <p class="text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2">Busiest hours</p>
+                        <div class="relative flex-1 w-full min-h-[180px]"><div id="busyChart" class="absolute inset-0"></div></div>
                     </div>
                 </div>
 
                 <div class="w-full xl:w-2/5 glass-card flex flex-col min-w-0 h-[28rem] xl:h-auto shrink-0 xl:shrink xl:min-h-0">
                     <div class="px-5 py-4 border-b border-slate-700/50">
-                        <h3 class="text-sm font-extrabold text-fg tracking-tight">⚡ Up next</h3>
-                        <p class="text-xs text-slate-400 mt-0.5">Sorted by deadline, most urgent first</p>
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 class="text-sm font-extrabold text-fg tracking-tight">Up next</h3>
+                            <span id="taskCount" class="text-xs font-bold text-slate-400 bg-slate-700/40 rounded-full px-2.5 py-0.5 tabular-nums">0</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-0.5">Action items from your mail, most urgent first</p>
                     </div>
                     <div id="taskList" class="flex-1 overflow-y-auto p-3 space-y-2">
                         <div class="flex items-center justify-center h-full text-slate-500 text-sm">Loading…</div>
@@ -369,6 +374,12 @@
                     </div>
                     <p class="text-xs text-slate-400">Auto follows your device's "reduce motion" setting.</p>
                 </div>
+            </section>
+
+            <section class="space-y-3">
+                <h3 class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Dashboard</h3>
+                <p class="text-xs text-slate-400">Choose what your home screen shows. <span id="kpiCount"></span></p>
+                <div id="dashPrefs" class="space-y-4"></div>
             </section>
 
             <section class="space-y-3">
