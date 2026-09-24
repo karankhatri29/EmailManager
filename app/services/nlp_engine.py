@@ -3,14 +3,31 @@ from dataclasses import dataclass
 
 import spacy
 
-# Initialize the spaCy core model
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    import os
+MODEL_NAME = "en_core_web_sm"
 
-    os.system("python -m spacy download en_core_web_sm")
-    nlp = spacy.load("en_core_web_sm")
+
+def load_model():
+    """Loads the small English model.
+
+    spacy.load(name) finds the model through the installed package's metadata (its .dist-info folder). Some hosts,
+    such as serverless bundles, leave that folder out although the package itself is there, so importing the package
+    and calling its own load() is the fallback: it needs only the files. Nothing is downloaded at start-up.
+    """
+    try:
+        return spacy.load(MODEL_NAME)
+    except OSError:
+        try:
+            import importlib
+
+            return importlib.import_module(MODEL_NAME).load()
+        except ImportError:
+            raise RuntimeError(
+                f"The spaCy model {MODEL_NAME} is not installed. Install it with: pip install {MODEL_NAME} "
+                "(see requirements.txt for the exact wheel), or python -m spacy download " + MODEL_NAME
+            ) from None
+
+
+nlp = load_model()
 
 
 # =============================================================

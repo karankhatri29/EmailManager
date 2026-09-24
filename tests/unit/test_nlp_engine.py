@@ -41,3 +41,32 @@ def test_informational_guard_blocks_urgent():
 def test_a_negated_deadline_is_not_a_deadline():
     _, cat = calculate_priority("Policy", "There is no deadline for this. Please read when you have time.")
     assert cat != "Urgent / Action Required"
+
+
+def test_model_loads_from_the_package_when_its_metadata_is_missing(monkeypatch):
+    """Serverless bundles can drop the .dist-info folder spacy.load(name) looks for; the package itself still loads."""
+    from app.services import nlp_engine
+
+    calls = []
+
+    def no_metadata(name):
+        calls.append(name)
+        raise OSError("E050: Can't find model")
+
+    monkeypatch.setattr(nlp_engine.spacy, "load", no_metadata)
+    assert nlp_engine.load_model()("Please pay the bill.")[0].text == "Please"
+    assert calls == ["en_core_web_sm"]
+
+
+def test_a_missing_model_gives_a_clear_error_and_downloads_nothing(monkeypatch):
+    import importlib
+
+    from app.services import nlp_engine
+
+    def missing(name, *args, **kwargs):
+        raise ImportError(name)
+
+    monkeypatch.setattr(nlp_engine.spacy, "load", lambda name: (_ for _ in ()).throw(OSError("E050")))
+    monkeypatch.setattr(importlib, "import_module", missing)
+    with pytest.raises(RuntimeError, match="not installed"):
+        nlp_engine.load_model()
