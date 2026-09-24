@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from ..core.config import DEFAULT_TIMEFRAME, get_settings
+from ..core.redirects import GOOGLE_PATH, MICROSOFT_PATH, remember_origin, request_origin, resolve
 from ..core.security import decrypt
 from ..db.models import User
 from ..db.session import get_db
@@ -59,6 +60,7 @@ def _finish_connect(
 
     Always ends in a redirect back to the app (with ?connected= or ?connect_error=).
     """
+    remember_origin(request)  # the token exchange must send the same redirect address as the sign-in did
     expected_state = request.session.pop(f"{session_prefix}oauth_state", None)
     verifier = request.session.pop(f"{session_prefix}oauth_verifier", None)
 
@@ -82,12 +84,24 @@ def _finish_connect(
     return RedirectResponse("/?connected=" + address)
 
 
+@router.get("/oauth-redirects")
+def oauth_redirects(request: Request, user: User = Depends(current_user)):
+    """The exact redirect addresses this site sends to Google and Microsoft. Register these in their consoles."""
+    settings = get_settings()
+    origin = request_origin(request)
+    return {
+        "google": resolve(settings.google_redirect_uri, GOOGLE_PATH, origin),
+        "microsoft": resolve(settings.microsoft_redirect_uri, MICROSOFT_PATH, origin),
+    }
+
+
 # --- Google --------------------------------------------------------------------------------------
 
 
 @router.get("/connect/google")
 def connect_google(request: Request, user: User = Depends(current_user)):
     """Sends the browser to Google's consent screen."""
+    remember_origin(request)
     url, state, verifier = google_oauth.authorization_url()
     request.session["oauth_state"] = state
     request.session["oauth_verifier"] = verifier
@@ -125,6 +139,7 @@ def connect_microsoft(request: Request, user: User = Depends(current_user)):
     """Sends the browser to Microsoft's consent screen."""
     if not get_settings().microsoft_configured:
         return RedirectResponse("/?connect_error=not_configured")
+    remember_origin(request)
     url, state, verifier = microsoft_oauth.authorization_url()
     request.session["ms_oauth_state"] = state
     request.session["ms_oauth_verifier"] = verifier

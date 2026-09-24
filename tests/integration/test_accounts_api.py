@@ -177,3 +177,31 @@ def test_cannot_disconnect_someone_elses_mailbox(auth_client, bob_client, bob_ac
     assert auth_client.delete(f"/api/accounts/{bob_account.id}").status_code == 404
     assert bob_client.get("/api/accounts").json()[0]["email_address"] == "bob@gmail.com"
     assert auth_client.delete("/api/accounts/9999").status_code == 404
+
+
+def test_redirect_address_falls_back_to_the_domain_being_used():
+    from app.core.redirects import resolve
+
+    origin = "https://mail.example.app"
+    path = "/api/accounts/google/callback"
+    assert resolve("https://<name>.vercel.app" + path, path, origin) == origin + path  # leftover placeholder
+    assert resolve("", path, origin) == origin + path
+    assert (
+        resolve("http://localhost:8000" + path, path, origin) == origin + path
+    )  # local default on a hosted site
+    assert (
+        resolve("http://localhost:8000" + path, path, "http://localhost:8000")
+        == "http://localhost:8000" + path
+    )
+    assert (
+        resolve("https://mine.example" + path, path, origin) == "https://mine.example" + path
+    )  # explicit wins
+
+
+def test_oauth_redirects_endpoint_shows_what_to_register(auth_client):
+    body = auth_client.get(
+        "/api/accounts/oauth-redirects",
+        headers={"x-forwarded-host": "site.example", "x-forwarded-proto": "https"},
+    ).json()
+    assert body["google"].endswith("/api/accounts/google/callback")
+    assert body["microsoft"].endswith("/api/accounts/microsoft/callback")

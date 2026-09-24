@@ -10,6 +10,7 @@ from urllib.parse import urlencode
 import requests
 
 from ..core.config import MICROSOFT_SCOPES, get_settings
+from ..core.redirects import MICROSOFT_PATH, resolve
 
 GRAPH_ME = "https://graph.microsoft.com/v1.0/me"
 TIMEOUT = 15
@@ -33,7 +34,7 @@ def authorization_url() -> tuple[str, str, str]:
         {
             "client_id": settings.microsoft_client_id,
             "response_type": "code",
-            "redirect_uri": settings.microsoft_redirect_uri,
+            "redirect_uri": resolve(settings.microsoft_redirect_uri, MICROSOFT_PATH),
             "response_mode": "query",
             "scope": " ".join(MICROSOFT_SCOPES),
             "state": state,
@@ -66,7 +67,7 @@ def finish(code: str, state: str, code_verifier: str) -> tuple[str, str]:
             "client_id": settings.microsoft_client_id,
             "client_secret": settings.microsoft_client_secret,
             "code": code,
-            "redirect_uri": settings.microsoft_redirect_uri,
+            "redirect_uri": resolve(settings.microsoft_redirect_uri, MICROSOFT_PATH),
             "code_verifier": code_verifier,
             "scope": " ".join(MICROSOFT_SCOPES),
         },

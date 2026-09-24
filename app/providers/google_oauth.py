@@ -6,6 +6,7 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
 from ..core.config import GMAIL_SCOPES, get_settings
+from ..core.redirects import GOOGLE_PATH, resolve
 
 # Google may return a different scope ordering/superset than requested; don't fail on that.
 os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
@@ -14,9 +15,10 @@ os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 def _build_flow(state: str | None = None, code_verifier: str | None = None) -> Flow:
     settings = get_settings()
     client_id, client_secret = settings.google_client()
+    redirect_uri = resolve(settings.google_redirect_uri, GOOGLE_PATH)
 
     # oauthlib refuses plain http except for local development.
-    if settings.google_redirect_uri.startswith(("http://localhost", "http://127.0.0.1")):
+    if redirect_uri.startswith(("http://localhost", "http://127.0.0.1")):
         os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
 
     config = {
@@ -25,13 +27,13 @@ def _build_flow(state: str | None = None, code_verifier: str | None = None) -> F
             "client_secret": client_secret,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": [settings.google_redirect_uri],
+            "redirect_uris": [redirect_uri],
         }
     }
     flow = Flow.from_client_config(
         config,
         scopes=GMAIL_SCOPES,
-        redirect_uri=settings.google_redirect_uri,
+        redirect_uri=redirect_uri,
         state=state,
         autogenerate_code_verifier=code_verifier is None,
     )
