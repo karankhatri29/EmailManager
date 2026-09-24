@@ -9,9 +9,11 @@ from ..db.models import MailAccount
 from ..providers import ProviderAuthError, get_provider
 from ..repositories import accounts as accounts_repo
 from ..repositories import emails as emails_repo
+from ..repositories import rules as rules_repo
 from .activities_service import create_activities_for_emails
 from .ai_summarizer import summarize_email
 from .email_processor import process_emails
+from .rules import to_specs
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +33,7 @@ def sync_account(db: Session, account: MailAccount, timeframe: str) -> int:
     try:
         ids = provider.list_message_ids(timeframe)
         new_ids = _unseen(db, account, ids)
-        raw = [provider.fetch_message(message_id) for message_id in new_ids]
+        raw = _download(provider, new_ids)
     except ProviderAuthError as exc:
         accounts_repo.mark_needs_reauth(db, account.id, str(exc))
         raise
@@ -42,7 +44,7 @@ def sync_account(db: Session, account: MailAccount, timeframe: str) -> int:
 
     for message in raw:
         message["id"] = emails_repo.make_email_id(account.id, message["id"])
-    processed = process_emails(raw)
+    processed = process_emails(raw, to_specs(rules_repo.list_for_user(db, account.user_id)))
     for email in processed:
         email["user_id"] = account.user_id
         email["account_id"] = account.id
@@ -54,6 +56,14 @@ def sync_account(db: Session, account: MailAccount, timeframe: str) -> int:
 
     summarize_pending(db, account.id)
     return len(raw)
+
+
+def _download(provider, message_ids: list[str]) -> list[dict]:
+    """Downloads messages in batches when the provider supports it (Gmail), else one by one."""
+    fetch_many = getattr(provider, "fetch_messages", None)
+    if fetch_many is not None:
+        return list(fetch_many(message_ids))
+    return [provider.fetch_message(message_id) for message_id in message_ids]
 
 
 def _unseen(db: Session, account: MailAccount, provider_ids: list[str]) -> list[str]:

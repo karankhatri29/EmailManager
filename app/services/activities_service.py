@@ -1,11 +1,17 @@
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..core.config import SUMMARIZED_CATEGORIES
+from ..core.config import ACTIONABLE_MAX_AGE_DAYS, SUMMARIZED_CATEGORIES
 from ..db.models import Activity
 from ..repositories import activities as activities_repo
 from .deadlines import NO_DEADLINE, resolve_deadline
 from .nlp_engine import extract_action_task, extract_explicit_deadline, nlp, process_text
+
+
+def _aware(value: datetime) -> datetime:
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
 
 def activity_from_email(email: dict) -> dict:
@@ -33,8 +39,9 @@ def activity_from_email(email: dict) -> dict:
 
 
 def create_activities_for_emails(db: Session, emails: list[dict]) -> int:
-    """Creates activities for the Urgent/Important emails that don't have one yet."""
-    candidates = [e for e in emails if e["category"] in SUMMARIZED_CATEGORIES]
+    """Creates activities for the recent Urgent/Important emails that don't have one yet."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=ACTIONABLE_MAX_AGE_DAYS)
+    candidates = [e for e in emails if e["category"] in SUMMARIZED_CATEGORIES and _aware(e["date"]) >= cutoff]
     if not candidates:
         return 0
 

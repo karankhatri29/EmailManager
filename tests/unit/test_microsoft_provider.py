@@ -223,3 +223,44 @@ def test_finish_requires_a_refresh_token():
 
 def test_account_helper_still_creates_google_accounts(db, user):
     assert make_account(db, user).provider == "google"
+
+
+# --- pagination, threads, unsubscribe ---------------------------------------------------------------
+
+
+def test_list_message_ids_follows_next_links_up_to_the_limit():
+    provider = MicrosoftProvider(_creds())
+    next_url = "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$skiptoken=abc"
+    with patch(MS) as requests:
+        requests.get.side_effect = [
+            _response(body={"value": [{"id": "G1"}, {"id": "G2"}], "@odata.nextLink": next_url}),
+            _response(body={"value": [{"id": "G3"}, {"id": "G4"}], "@odata.nextLink": next_url + "2"}),
+        ]
+        ids = provider.list_message_ids("Last 1 Week", limit=3)
+
+    assert ids == [_short_id(g) for g in ("G1", "G2", "G3")]  # trimmed to the limit, no third request
+    assert requests.get.call_count == 2
+    assert requests.get.call_args.args[0] == next_url  # later pages use the absolute link, without new params
+    assert requests.get.call_args.kwargs["params"] is None
+
+
+def test_fetch_message_includes_thread_and_unsubscribe_when_present():
+    provider = MicrosoftProvider(_creds())
+    message = {
+        "subject": "Deals",
+        "from": {"emailAddress": {"address": "shop@x.com"}},
+        "body": {"content": "hi"},
+        "receivedDateTime": "2026-01-02T03:04:05Z",
+        "conversationId": "conv-1",
+        "internetMessageHeaders": [
+            {"name": "List-Unsubscribe", "value": "<https://x.com/u>"},
+            {"name": "List-Unsubscribe-Post", "value": "List-Unsubscribe=One-Click"},
+        ],
+    }
+    with patch(MS) as requests:
+        requests.get.side_effect = [_response(body={"value": [{"id": "G1"}]}), _response(body=message)]
+        (short,) = provider.list_message_ids("Last 1 Day")
+        result = provider.fetch_message(short)
+
+    assert result["thread_id"] == "conv-1"
+    assert result["unsubscribe_url"] == "https://x.com/u" and result["unsubscribe_one_click"] is True

@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 MICROSOFT_SCOPES = ["offline_access", "User.Read", "Mail.Read"]
 
-Timeframe = Literal["Last 1 Day", "Last 1 Week", "Last 1 Month"]
+Timeframe = Literal["Last 1 Day", "Last 1 Week", "Last 1 Month", "Last 3 Months", "Last 1 Year"]
 DEFAULT_TIMEFRAME: Timeframe = "Last 1 Day"
 
 # timeframe label -> (Gmail search query, window size in days)
@@ -18,7 +18,23 @@ TIMEFRAMES: dict[str, tuple[str, int]] = {
     "Last 1 Day": ("newer_than:1d", 1),
     "Last 1 Week": ("newer_than:7d", 7),
     "Last 1 Month": ("newer_than:30d", 30),
+    "Last 3 Months": ("newer_than:90d", 90),
+    "Last 1 Year": ("newer_than:365d", 365),
 }
+
+# How many messages one sync pulls at most, per timeframe (long windows are for search and history).
+TIMEFRAME_MESSAGE_LIMITS: dict[str, int] = {
+    "Last 1 Day": 200,
+    "Last 1 Week": 400,
+    "Last 1 Month": 800,
+    "Last 3 Months": 1500,
+    "Last 1 Year": 3000,
+}
+
+# Older mail is stored, classified and searchable, but is not summarised by AI, turned into
+# calendar items or announced with notifications: those only make sense for recent mail.
+ACTIONABLE_MAX_AGE_DAYS = 30
+URGENT_ALERT_MAX_AGE_DAYS = 2
 
 # Categories that get an AI summary and an activity
 SUMMARIZED_CATEGORIES = ["Urgent / Action Required", "Important"]
@@ -55,6 +71,17 @@ class Settings(BaseSettings):
     microsoft_tenant: str = "common"
     microsoft_redirect_uri: str = "http://localhost:8000/api/accounts/microsoft/callback"
 
+    gemini_embedding_model: str = "gemini-embedding-001"
+
+    # Outgoing mail for the daily briefing and reminder emails. Leave smtp_host empty to disable email
+    # (briefings and reminders then appear in the app only).
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
+
     sync_interval_seconds: int = 300
     sync_max_workers: int = 4  # mailboxes synced concurrently
     # Run the periodic sync inside the API process (local dev without Redis).
@@ -75,6 +102,10 @@ class Settings(BaseSettings):
             "Google OAuth client not configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, "
             "or provide credentials.json."
         )
+
+    @property
+    def smtp_configured(self) -> bool:
+        return bool(self.smtp_host and (self.smtp_from or self.smtp_user))
 
     @property
     def microsoft_configured(self) -> bool:

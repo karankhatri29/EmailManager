@@ -1,5 +1,5 @@
-import random
 import re
+from dataclasses import dataclass
 
 import spacy
 
@@ -187,10 +187,107 @@ def process_text(raw_text):
 # =============================================================
 # ⚡ SEMANTIC PRIORITY CLASSIFIER (With Informational Guards)
 # =============================================================
-def calculate_priority(subject, body):
+URGENT = "Urgent / Action Required"
+IMPORTANT = "Important"
+GENERAL = "General"
+PROMOTIONAL = "Promotional"
+CATEGORIES = [URGENT, IMPORTANT, GENERAL, PROMOTIONAL]
+
+# Score band of each category; more supporting evidence puts an email higher inside its band.
+SCORE_RANGES = {URGENT: (4.0, 4.8), IMPORTANT: (3.1, 3.5), GENERAL: (2.0, 2.5), PROMOTIONAL: (1.0, 1.4)}
+
+
+@dataclass(frozen=True)
+class Classification:
+    score: float
+    category: str
+    reason: str  # a plain-English "why", shown to the user
+
+
+def category_score(category):
+    """A representative score for a category (used when a rule or the user decides the category)."""
+    low, high = SCORE_RANGES[category]
+    return round((low + high) / 2, 2)
+
+
+def _scaled(low, high, evidence):
+    """Deterministic score in [low, high]: 0 pieces of evidence -> low, 3 or more -> high."""
+    return round(low + (high - low) * min(evidence, 3) / 3, 2)
+
+
+def _matches(text, phrases):
+    """The phrases that occur in the text as whole words (allowing a plural / -ed ending)."""
+    return [p for p in phrases if re.search(rf"\b{re.escape(p)}(?:s|es|d|ed)?\b", text)]
+
+
+def _quote(items):
+    return ", ".join(f"“{i}”" for i in items[:3])
+
+
+PROMO_TRIGGERS = [
+    "off",
+    "discount",
+    "sale",
+    "subscribe",
+    "unsubscribe",
+    "cashback offer",
+    "pre-approved",
+    "bonus points",
+    "gift card",
+    "newsletter",
+    "shop now",
+    "advertisement",
+]
+SECURITY_TRIGGERS = [
+    "otp",
+    "verification code",
+    "2fa",
+    "login detected",
+    "unauthorized access",
+    "password reset",
+    "security alert",
+    "suspicious sign-in",
+    "action required to secure",
+]
+FINANCIAL_VERBS = ["debited", "credited", "transferred", "charged", "withdrawn", "processed successfully"]
+INFORMATIONAL_GUARDS = [
+    "no action required",
+    "action is not required",
+    "no action is required",
+    "please do not reply",
+    "do not reply to this",
+    "automated notification",
+    "informational purposes only",
+    "requires no action",
+    "requires no response",
+    "weekly digest",
+    "newsletter",
+    "monthly update",
+    "read below for updates",
+    "news summary",
+    "daily brief",
+    "summary of achievements",
+    "successfully updated",
+]
+DEADLINE_MARKERS = ["deadline", "due date", "by end of day", "final call to submit"]
+TASK_LEMMAS = ["submit", "complete", "review", "verify", "reply", "attend", "fill", "upload", "pay"]
+URGENCY_WORDS = ["please", "kindly", "must", "required", "urgently"]
+NOTICE_MARKERS = [
+    "announcement",
+    "notice",
+    "update regarding",
+    "update",
+    "schedule",
+    "meeting minutes",
+    "status report",
+    "digest",
+]
+
+
+def classify(subject, body):
     """
-    Granular Classifier. Analyzes text metrics to separate security alerts,
-    real transaction receipts, and true assignments from generic noise or newsletters.
+    Granular classifier. Separates security alerts, real transaction receipts and true
+    assignments from generic noise or newsletters, and says why in plain English.
     """
     nlp_data = process_text(f"{subject} {body}")
 
@@ -198,136 +295,72 @@ def calculate_priority(subject, body):
     tokens = nlp_data["tokens"]
     entities = nlp_data["entities"]
 
-    # -------------------------------------------------------------
-    # Rule 1: PROMOTIONAL / ADS / MARKETING FILTER
-    # -------------------------------------------------------------
-    promo_triggers = [
-        "off",
-        "discount",
-        "sale",
-        "subscribe",
-        "unsubscribe",
-        "cashback offer",
-        "pre-approved",
-        "bonus points",
-        "gift card",
-        "newsletter",
-        "shop now",
-        "advertisement",
-    ]
-    if any(trigger in text_raw for trigger in promo_triggers):
-        return random.uniform(1.0, 1.4), "Promotional"
+    # Rule 1: promotional / ads / marketing
+    promo = _matches(text_raw, PROMO_TRIGGERS)
+    if promo:
+        return Classification(
+            _scaled(*SCORE_RANGES[PROMOTIONAL], len(promo) - 1),
+            PROMOTIONAL,
+            f"Looks promotional: mentions {_quote(promo)}.",
+        )
 
-    # -------------------------------------------------------------
-    # Rule 2: SECURITY & AUTHENTICATION ENGINE
-    # -------------------------------------------------------------
-    security_triggers = [
-        "otp",
-        "verification code",
-        "2fa",
-        "login detected",
-        "unauthorized access",
-        "password reset",
-        "security alert",
-        "suspicious sign-in",
-        "action required to secure",
-    ]
-    if any(trigger in text_raw for trigger in security_triggers):
-        return round(random.uniform(4.5, 4.8), 2), "Urgent / Action Required"
+    # Rule 2: security and authentication
+    security = _matches(text_raw, SECURITY_TRIGGERS)
+    if security:
+        return Classification(
+            _scaled(4.5, 4.8, len(security)),
+            URGENT,
+            f"Security or sign-in message: mentions {_quote(security)}.",
+        )
 
-    # -------------------------------------------------------------
-    # Rule 3: SEMANTIC BANKING & REAL TRANSACTION RECEIPT VALIDATOR
-    # -------------------------------------------------------------
-    financial_verbs = ["debited", "credited", "transferred", "charged", "withdrawn", "processed successfully"]
-    has_financial_verb = any(verb in text_raw for verb in financial_verbs)
+    # Rule 3: banking and real transaction receipts
+    verbs = _matches(text_raw, FINANCIAL_VERBS)
     has_real_currency = len(entities["MONEY"]) > 0
+    money_context = [w for w in ("bank", "statement", "invoice") if w in text_raw]
+    if verbs or (money_context and has_real_currency):
+        if verbs:
+            reason = f"Reports money movement: mentions {_quote(verbs)}."
+        else:
+            reason = f"A {money_context[0]} message that includes an amount of money."
+        return Classification(_scaled(4.2, 4.4, len(verbs) + int(has_real_currency)), URGENT, reason)
 
-    if has_financial_verb or (
-        ("bank" in text_raw or "statement" in text_raw or "invoice" in text_raw) and has_real_currency
-    ):
-        return round(random.uniform(4.2, 4.4), 2), "Urgent / Action Required"
+    # Rule 4: imperative obligations (with informational guards)
+    informational = _matches(text_raw, INFORMATIONAL_GUARDS)
+    deadline_markers = _matches(text_raw, DEADLINE_MARKERS)
 
-    # -------------------------------------------------------------
-    # Rule 4: IMPERATIVE OBLIGATION PARSER (With Heavy System/Info Noise Filters)
-    # -------------------------------------------------------------
-    # Guard strings representing system notifications or general text summaries
-    informational_guards = [
-        "no action required",
-        "action is not required",
-        "no action is required",
-        "please do not reply",
-        "do not reply to this",
-        "automated notification",
-        "informational purposes only",
-        "requires no action",
-        "requires no response",
-        "weekly digest",
-        "newsletter",
-        "monthly update",
-        "read below for updates",
-        "news summary",
-        "daily brief",
-        "summary of achievements",
-        "successfully updated",
-    ]
-    is_explicitly_informational = any(guard in text_raw for guard in informational_guards)
-
-    has_action_obligation = False
-    explicit_deadline_markers = ["deadline", "due date", "by end of day", "final call to submit"]
-    has_explicit_deadline = any(marker in text_raw for marker in explicit_deadline_markers)
-
-    if not is_explicitly_informational:
-        # Check for un-negated action flags
+    evidence = []
+    if not informational:
         if "action required" in text_raw and not any(neg in text_raw for neg in ["no action", "not require"]):
-            has_action_obligation = True
-
-        # Dependency verification pass
+            evidence.append("says “action required”")
         for t in tokens:
-            if t["pos"] == "VERB" and t["dep"] in ["ROOT", "xcomp"]:
-                task_lemmas = [
-                    "submit",
-                    "complete",
-                    "review",
-                    "verify",
-                    "reply",
-                    "attend",
-                    "fill",
-                    "upload",
-                    "pay",
-                    "submit",
-                ]
-                if t["lemma"] in task_lemmas and any(
-                    cmd in text_raw for cmd in ["please", "kindly", "must", "required", "urgently"]
-                ):
-                    has_action_obligation = True
+            if t["pos"] == "VERB" and t["dep"] in ["ROOT", "xcomp"] and t["lemma"] in TASK_LEMMAS:
+                urgency = _matches(text_raw, URGENCY_WORDS)
+                if urgency:
+                    evidence.append(f"asks you to {t['lemma']} something ({_quote(urgency)})")
                     break
+        if deadline_markers:
+            evidence.append(f"mentions a deadline ({_quote(deadline_markers)})")
 
-    # Route true priority items to Urgent
-    if (has_action_obligation or has_explicit_deadline) and not is_explicitly_informational:
-        return round(random.uniform(4.0, 4.1), 2), "Urgent / Action Required"
+    if evidence:
+        return Classification(_scaled(4.0, 4.1, len(evidence)), URGENT, "Needs action: " + "; ".join(evidence) + ".")
 
-    # -------------------------------------------------------------
-    # Rule 5: IMPORTANT UPDATES, ANNOUNCEMENTS & INFO BROADCASTS
-    # -------------------------------------------------------------
-    notice_markers = [
-        "announcement",
-        "notice",
-        "update regarding",
-        "update",
-        "schedule",
-        "meeting minutes",
-        "status report",
-        "digest",
-    ]
-    if (
-        any(marker in text_raw for marker in notice_markers)
-        or subject.strip().startswith("[")
-        or is_explicitly_informational
-    ):
-        # Realistic, normalized intermediate priority scoring range
-        return round(random.uniform(3.1, 3.5), 2), "Important"
+    # Rule 5: announcements, updates, information broadcasts
+    notices = _matches(text_raw, NOTICE_MARKERS)
+    tagged = subject.strip().startswith("[")
+    if notices or tagged or informational:
+        if notices:
+            reason = f"Looks like an announcement or update: mentions {_quote(notices)}."
+        elif tagged:
+            reason = "The subject carries a project or course tag."
+        else:
+            reason = "Informational message; no action is asked of you."
+        return Classification(_scaled(3.1, 3.5, len(notices) + int(tagged)), IMPORTANT, reason)
 
-    # -------------------------------------------------------------
-    # Rule 6: DEFAULT GENERAL FALLBACK BOUNDARY
-    # -------------------------------------------------------------
-    return round(random.uniform(2.0, 2.5), 2), "General"
+    # Rule 6: default
+    return Classification(2.0, GENERAL, "No urgent, action or announcement wording found.")
+
+
+def calculate_priority(subject, body):
+    """(score, category) for an email. See classify() for the reason as well."""
+    result = classify(subject, body)
+    return result.score, result.category

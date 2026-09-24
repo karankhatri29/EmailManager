@@ -1,17 +1,19 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.db.models import Activity
 from app.repositories import emails as emails_repo
 from app.services import activities_service
 from tests.conftest import stored_email
 
-SENT = datetime(2026, 9, 24, 12, 0, tzinfo=timezone.utc)
+# Dates are relative to "now" so these tests never go stale.
+SENT = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
+DUE = SENT + timedelta(days=10)
 
 
 def _email(account, message_id="m1", **extra):
     fields = {
         "subject": "Assignment due",
-        "body": "Please submit the report by 15/10/2026.",
+        "body": f"Please submit the report by {DUE:%d/%m/%Y}.",
         "sender": "Prof <prof@uni.edu>",
         "date": SENT,
         "category": "Urgent / Action Required",
@@ -23,7 +25,7 @@ def test_activity_from_email_with_a_deadline(account):
     activity = activities_service.activity_from_email(_email(account))
 
     assert activity["user_id"] == account.user_id and activity["email_id"] == f"{account.id}:m1"
-    assert activity["start_at"] == datetime(2026, 10, 15, tzinfo=timezone.utc)
+    assert activity["start_at"] == datetime(DUE.year, DUE.month, DUE.day, tzinfo=timezone.utc)
     assert activity["all_day"] is True and activity["source"] == "email" and activity["status"] == "todo"
     assert activity["title"] and len(activity["title"]) <= 255
     assert "From: Prof <prof@uni.edu>" in activity["notes"] and "Deadline detected" in activity["notes"]
@@ -59,3 +61,11 @@ def test_running_twice_does_not_duplicate_activities(db, account):
 
 def test_no_candidates(db):
     assert activities_service.create_activities_for_emails(db, []) == 0
+
+
+def test_old_mail_does_not_become_calendar_items(db, account):
+    old = _email(account, "old", date=SENT - timedelta(days=90))
+    recent = _email(account, "recent")
+    emails_repo.upsert_many(db, [old, recent])
+    assert activities_service.create_activities_for_emails(db, [old, recent]) == 1
+    assert [a.email_id.split(":")[1] for a in db.query(Activity)] == ["recent"]

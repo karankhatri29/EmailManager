@@ -34,6 +34,7 @@ from app.main import create_app  # noqa: E402
 from app.repositories import accounts as accounts_repo  # noqa: E402
 from app.repositories import users as users_repo  # noqa: E402
 from app.services import background  # noqa: E402
+from app.services.senders import sender_address as parse_sender_address  # noqa: E402
 
 ALICE = "alice@example.com"
 BOB = "bob@example.com"
@@ -158,6 +159,7 @@ def stored_email(account, message_id="m1", **extra):
     """An email dict as stored in the database (already processed and owned)."""
     email = {
         **make_email(message_id),
+        "sender_address": parse_sender_address(extra.get("sender", "Bob <bob@x.com>")),
         "id": f"{account.id}:{message_id}",
         "user_id": account.user_id,
         "account_id": account.id,

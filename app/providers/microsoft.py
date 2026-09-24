@@ -7,12 +7,13 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 
-from ..core.config import MICROSOFT_SCOPES, TIMEFRAMES, get_settings
+from ..core.config import MICROSOFT_SCOPES, TIMEFRAME_MESSAGE_LIMITS, TIMEFRAMES, get_settings
 from .base import ProviderAuthError
+from .common import parse_list_unsubscribe
 from .microsoft_oauth import credentials_from_token, token_endpoint
 
 GRAPH = "https://graph.microsoft.com/v1.0"
-MAX_RESULTS = 50
+PAGE_SIZE = 100
 MAX_BODY_CHARS = 4000
 TIMEOUT = 15
 EXPIRY_MARGIN_SECONDS = 60
@@ -81,7 +82,7 @@ class MicrosoftProvider:
 
     def _get(self, path: str, params: dict | None = None, headers: dict | None = None) -> dict:
         response = requests.get(
-            f"{GRAPH}{path}",
+            path if path.startswith("https://") else f"{GRAPH}{path}",
             params=params,
             headers={"Authorization": f"Bearer {self._access_token()}", **(headers or {})},
             timeout=TIMEOUT,
@@ -93,24 +94,27 @@ class MicrosoftProvider:
 
     # --- MailProvider ---
 
-    def list_message_ids(self, timeframe: str) -> list[str]:
+    def list_message_ids(self, timeframe: str, limit: int | None = None) -> list[str]:
         days = TIMEFRAMES.get(timeframe, ("", 1))[1]
+        limit = limit or TIMEFRAME_MESSAGE_LIMITS.get(timeframe, PAGE_SIZE)
         since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        data = self._get(
-            "/me/mailFolders/inbox/messages",
-            params={
-                "$filter": f"receivedDateTime ge {since}",
-                "$orderby": "receivedDateTime desc",
-                "$select": "id",
-                "$top": MAX_RESULTS,
-            },
-        )
-        ids = []
-        for message in data.get("value", []):
-            short = _short_id(message["id"])
-            self._real_ids[short] = message["id"]
-            ids.append(short)
-        return ids
+
+        ids: list[str] = []
+        url: str | None = "/me/mailFolders/inbox/messages"
+        params: dict | None = {
+            "$filter": f"receivedDateTime ge {since}",
+            "$orderby": "receivedDateTime desc",
+            "$select": "id",
+            "$top": min(PAGE_SIZE, limit),
+        }
+        while url and len(ids) < limit:
+            data = self._get(url, params=params)
+            for message in data.get("value", []):
+                short = _short_id(message["id"])
+                self._real_ids[short] = message["id"]
+                ids.append(short)
+            url, params = data.get("@odata.nextLink"), None  # the next link already carries its own query
+        return ids[:limit]
 
     def fetch_message(self, message_id: str) -> dict:
         graph_id = self._real_ids.get(message_id)
@@ -119,17 +123,26 @@ class MicrosoftProvider:
 
         message = self._get(
             f"/me/messages/{graph_id}",
-            params={"$select": "subject,from,body,bodyPreview,receivedDateTime"},
+            params={"$select": "subject,from,body,bodyPreview,receivedDateTime,conversationId,internetMessageHeaders"},
             headers={"Prefer": 'outlook.body-content-type="text"'},
         )
         body = ((message.get("body") or {}).get("content") or "").strip() or message.get("bodyPreview", "")
-        return {
+        result = {
             "id": message_id,
             "sender": _format_sender(message),
             "subject": message.get("subject") or "No Subject",
             "body": body[:MAX_BODY_CHARS],
             "date": _parse_date(message.get("receivedDateTime")),
         }
+        if message.get("conversationId"):
+            result["thread_id"] = message["conversationId"]
+
+        headers = {h.get("name", "").lower(): h.get("value", "") for h in message.get("internetMessageHeaders") or []}
+        url, one_click = parse_list_unsubscribe(headers.get("list-unsubscribe"), headers.get("list-unsubscribe-post"))
+        if url:
+            result["unsubscribe_url"] = url
+            result["unsubscribe_one_click"] = one_click
+        return result
 
     def export_credentials(self) -> str | None:
         """Updated credentials (plaintext JSON) if the access token was refreshed while in use."""

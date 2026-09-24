@@ -47,18 +47,130 @@ class AccountOut(BaseModel):
 
 
 class EmailOut(BaseModel):
+    """A full email, including its body (used for the dashboard and the detail view)."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
     account_id: int
     sender: str
+    sender_address: str = ""
     subject: str
     body: str
     score: float
     category: str
+    category_source: str = "auto"  # auto | rule | user
+    reason: str | None = None  # plain-English "why this category"
     date: datetime
     summary: str | None = None
     task: str | None = None
+    is_done: bool = False
+    snoozed_until: datetime | None = None
+    thread_id: str | None = None
+    unsubscribe_url: str | None = None
+    unsubscribe_one_click: bool = False
+
+    @field_validator("date", "snoozed_until")
+    @classmethod
+    def _utc(cls, value):
+        return _as_utc(value)
+
+
+class EmailListItem(BaseModel):
+    """A row in the inbox list: no full body, just enough to scan."""
+
+    id: str
+    account_id: int
+    sender: str
+    sender_address: str
+    subject: str
+    snippet: str
+    date: datetime
+    score: float
+    category: str
+    category_source: str
+    reason: str | None = None
+    is_done: bool
+    snoozed_until: datetime | None = None
+    has_summary: bool
+    thread_id: str | None = None
+    can_unsubscribe: bool = False
+
+    @field_validator("date", "snoozed_until")
+    @classmethod
+    def _utc(cls, value):
+        return _as_utc(value)
+
+
+class InboxPage(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: list[EmailListItem]
+
+
+class EmailUpdate(BaseModel):
+    """Partial update of one email. Only the fields sent are applied."""
+
+    category: Literal["Urgent / Action Required", "Important", "General", "Promotional"] | None = None
+    apply_to_sender: bool = False  # with `category`: also remember it as a rule for this sender
+    is_done: bool | None = None
+    snoozed_until: datetime | None = None  # null wakes the email now
+
+    @field_validator("snoozed_until")
+    @classmethod
+    def _utc(cls, value):
+        return _as_utc(value)
+
+
+class RuleIn(BaseModel):
+    kind: Literal["sender", "domain", "keyword"]
+    pattern: str = Field(min_length=1, max_length=320)
+    category: Literal["Urgent / Action Required", "Important", "General", "Promotional"]
+
+
+class RuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    kind: str
+    pattern: str
+    category: str
+    created_at: datetime
+
+
+class RuleCreated(RuleOut):
+    affected: int  # how many stored emails changed category because of it
+
+
+class NewsletterOut(BaseModel):
+    sender_address: str
+    sender: str
+    count: int
+    last_date: datetime
+    last_subject: str
+    account_id: int
+    can_unsubscribe: bool
+    one_click: bool
+    muted: bool
+
+    @field_validator("last_date")
+    @classmethod
+    def _utc(cls, value):
+        return _as_utc(value)
+
+
+class UnsubscribeRequest(BaseModel):
+    sender_address: str = Field(min_length=3, max_length=320)
+    mute: bool = True  # also stop showing this sender's mail as anything but Promotional
+
+
+class UnsubscribeResult(BaseModel):
+    method: Literal["one_click", "link", "none"]
+    url: str | None = None  # for "link": open it to finish unsubscribing
+    ok: bool
+    detail: str = ""
+    muted: bool = False
 
 
 class TaskOut(BaseModel):

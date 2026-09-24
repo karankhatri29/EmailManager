@@ -1,6 +1,8 @@
 from datetime import datetime
 
 from sqlalchemy import ColumnElement, and_, or_, select
+from sqlalchemy import delete as sql_delete
+from sqlalchemy import update as sql_update
 from sqlalchemy.orm import Session
 
 from ..db.models import Activity
@@ -69,3 +71,20 @@ def list_scheduled_open(db: Session, user_id: int) -> list[Activity]:
         Activity.user_id == user_id, Activity.start_at.is_not(None), Activity.status != "done"
     )
     return list(db.scalars(query.order_by(Activity.start_at)))
+
+
+def delete_open_for_emails(db: Session, email_ids: list[str]) -> int:
+    """Removes the still-open calendar items that were created from these emails."""
+    if not email_ids:
+        return 0
+    result = db.execute(
+        sql_delete(Activity).where(Activity.email_id.in_(email_ids), Activity.status != "done", Activity.source == "email")
+    )
+    db.commit()
+    return result.rowcount or 0
+
+
+def set_status_for_email(db: Session, email_id: str, status: str) -> None:
+    """Marks the calendar item created from an email as done / open again."""
+    db.execute(sql_update(Activity).where(Activity.email_id == email_id).values(status=status))
+    db.commit()
