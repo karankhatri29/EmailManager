@@ -1,22 +1,35 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark" data-accent="violet" data-density="comfortable" data-motion="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#0f172a">
+    <meta name="theme-color" content="#0e0b1f">
+    <meta name="color-scheme" content="dark light">
     <title>Email Prioritizer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <style>
-        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', system-ui, sans-serif; }
-        .glass-card { background-color: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(51, 65, 85, 0.5); border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-        .btn-active { background-color: #3b82f6; color: white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.3); }
-        .btn-inactive { background-color: transparent; color: #94a3b8; }
-        .btn-inactive:hover { background-color: rgba(51, 65, 85, 0.5); color: white; }
-        .field { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 0.5rem; padding: 0.6rem 0.75rem; font-size: 0.875rem; color: #e2e8f0; outline: none; }
-        .field:focus { border-color: #3b82f6; }
 
-        /* ---- Responsive behaviour ---- */
+    <!-- Apply saved settings (and the device's light/dark choice) before first paint: no flash of the wrong theme. -->
+    <script>
+        (function () {
+            var root = document.documentElement, prefs = {};
+            try { prefs = JSON.parse(localStorage.getItem('ep-prefs-v1') || '{}'); } catch (e) {}
+            var pick = function (value, allowed, fallback) { return allowed.indexOf(value) > -1 ? value : fallback; };
+            var deviceLight = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches;
+            root.dataset.theme = pick(prefs.theme, ['light', 'dark'], deviceLight ? 'light' : 'dark');
+            root.dataset.accent = pick(prefs.accent, ['pink', 'blue', 'mint', 'sunset'], 'violet');
+            root.dataset.density = pick(prefs.density, ['compact', 'roomy'], 'comfortable');
+            root.dataset.motion = pick(prefs.motion, ['full', 'reduced'], 'auto');
+        })();
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="{{ url_for('static', path='js/tailwind-config.js') }}"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/theme.css') }}">
+    <style>
+        /* ---- Responsive behaviour (colours and component looks live in css/theme.css) ---- */
         html, body { overflow-x: hidden; }
         body { height: 100vh; height: 100dvh; } /* dvh: phone browser bars do not clip the bottom */
 
@@ -36,22 +49,19 @@
         }
 
         #syncStatus { max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        @media (max-width: 639px) { #syncStatus { display: none; } } /* phones: the status shows in the menu instead */
 
-        /* Phones: calendar chips shrink, and fingers get bigger targets. */
+        /* Phones: the month grid's tiny chips shrink further (day and week views stay roomy). */
         @media (max-width: 639px) {
-            #calendarGrid [data-activity] { font-size: 9px; padding: 0 2px; }
-            #calendarGrid [data-day] { padding: 2px; }
+            #calendarGrid[data-view='month'] [data-activity] { font-size: 9px; padding: 0 2px; }
+            #calendarGrid[data-view='month'] [data-day] { padding: 2px; }
         }
         @media (pointer: coarse) {
-            select, .field, nav button, #syncNow, form button, #connectPrompt button, #feedModal button, #accountFilter button { min-height: 2.5rem; }
+            select, .field, nav button, #syncNow, form button, #connectPrompt button, #feedModal button, #settingsModal button, #accountFilter button { min-height: 2.5rem; }
             /* small icon controls keep their look but get a 40px+ tap area */
             [data-done], [data-remove] { position: relative; }
             [data-done]::after, [data-remove]::after { content: ''; position: absolute; inset: -12px; }
         }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 </head>
 <body class="h-screen w-full overflow-hidden">
@@ -59,21 +69,26 @@
     <div id="toasts" class="fixed top-4 right-4 left-4 sm:left-auto z-[100] space-y-2 flex flex-col items-end pointer-events-none [&>*]:pointer-events-auto"></div>
 
     <!-- ============ Sign in / create account ============ -->
-    <section id="authScreen" class="hidden h-full w-full items-center justify-center p-4 sm:p-6 overflow-y-auto bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-800/40 via-slate-900 to-slate-900">
+    <section id="authScreen" class="hidden h-full w-full items-center justify-center p-4 sm:p-6 overflow-y-auto">
         <div class="glass-card w-full max-w-sm p-6 sm:p-8 my-auto">
-            <h1 class="text-2xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-1">Email Prioritizer</h1>
-            <p class="text-slate-400 text-sm mb-6">Your inbox, ranked. Your deadlines, scheduled.</p>
-            <h2 id="authTitle" class="text-lg font-semibold mb-4">Welcome back</h2>
+            <div class="flex items-center gap-3 mb-2">
+                <span class="logo-tile" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0-9.75 6.5-9.75-6.5" /></svg>
+                </span>
+                <h1 class="wordmark text-2xl">Email <span class="text-gradient">Prioritizer</span></h1>
+            </div>
+            <p class="text-slate-400 text-sm mb-6">Your inbox, ranked. Your deadlines, sorted. ✨</p>
+            <h2 id="authTitle" class="text-lg font-bold text-fg mb-4">Welcome back</h2>
             <form id="authForm" class="space-y-3">
                 <input id="authEmail" type="email" required autocomplete="email" placeholder="Email" class="field">
                 <input id="authPassword" type="password" required minlength="8" maxlength="128" autocomplete="current-password" placeholder="Password" class="field">
                 <p id="authHint" class="hidden text-xs text-slate-500">At least 8 characters.</p>
                 <p id="authError" class="hidden text-sm text-red-400"></p>
-                <button id="authSubmit" type="submit" class="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition cursor-pointer">Sign in</button>
+                <button id="authSubmit" type="submit" class="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium py-3 rounded-lg transition cursor-pointer">Sign in</button>
             </form>
             <p class="text-sm text-slate-400 mt-5 text-center">
                 <span id="authSwitchText">Don't have an account?</span>
-                <button id="authSwitch" type="button" class="text-blue-400 hover:text-blue-300 underline cursor-pointer">Create one</button>
+                <button id="authSwitch" type="button" class="text-blue-400 hover:text-blue-300 font-semibold underline cursor-pointer">Create one</button>
             </p>
         </div>
     </section>
@@ -81,107 +96,140 @@
     <!-- ============ App ============ -->
     <div id="appShell" class="hidden h-full w-full">
 
-        <aside id="sidebar" class="relative flex-shrink-0 bg-slate-900 border-r border-slate-700/50 flex flex-col p-5 shadow-xl z-20 transition-all duration-300 ease-in-out">
-            <button id="sidebarToggle" class="absolute top-6 -right-3 w-6 h-6 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-full flex items-center justify-center text-slate-400 hover:text-white transition shadow-md z-30 focus:outline-none cursor-pointer" aria-label="Toggle sidebar">
+        <aside id="sidebar" class="relative flex-shrink-0 bg-slate-900/70 backdrop-blur-xl border-r border-slate-700/50 flex flex-col p-5 shadow-xl z-20 transition-all duration-300 ease-in-out">
+            <button id="sidebarToggle" class="absolute top-6 -right-3 w-6 h-6 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-full flex items-center justify-center text-slate-400 hover:text-fg transition shadow-md z-30 focus:outline-none cursor-pointer" aria-label="Toggle sidebar">
                 <svg id="toggleChevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3 h-3 transition-transform duration-300">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                 </svg>
             </button>
 
             <div id="sidebarContent" class="flex flex-col h-full w-full min-h-0 transition-opacity duration-200 opacity-100">
-                <h1 class="text-xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 whitespace-nowrap mb-8 shrink-0">Email Prioritizer</h1>
+                <div class="flex items-center gap-3 mb-8 shrink-0">
+                    <span class="logo-tile" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0-9.75 6.5-9.75-6.5" /></svg>
+                    </span>
+                    <div class="wordmark">
+                        <span class="block text-[0.62rem] uppercase tracking-[0.28em] text-slate-400 font-bold mb-1">Email</span>
+                        <span class="block text-xl text-gradient">Prioritizer</span>
+                    </div>
+                </div>
 
                 <div class="flex flex-col gap-2 mb-5 shrink-0">
-                    <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Timeframe</label>
-                    <select id="timeFilter" class="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg p-2.5 outline-none focus:border-blue-500">
+                    <label for="timeFilter" class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Timeframe</label>
+                    <select id="timeFilter" class="bg-slate-800/70 border border-slate-600/70 text-fg text-sm rounded-lg p-2.5 outline-none focus:border-blue-500 cursor-pointer">
                         <option value="Last 1 Day">Last 24 Hours</option>
                         <option value="Last 1 Week">Last 7 Days</option>
                         <option value="Last 1 Month">Last 30 Days</option>
                     </select>
                 </div>
 
-                <button id="syncNow" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2.5 px-4 rounded-lg mb-6 transition shadow-lg shadow-blue-500/20 whitespace-nowrap cursor-pointer shrink-0">
+                <button id="syncNow" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2.5 px-4 rounded-lg mb-2 transition whitespace-nowrap cursor-pointer shrink-0">
                     🔄 Sync now
                 </button>
+                <p id="syncStatusSide" class="sm:hidden text-xs font-medium text-slate-500 mb-4 min-h-[1rem]" aria-live="polite"></p>
+                <div class="hidden sm:block mb-4"></div>
 
                 <hr class="border-slate-700/50 mb-5 shrink-0">
 
                 <div class="flex items-center justify-between mb-3 shrink-0">
-                    <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Mailboxes</h2>
+                    <h2 class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Mailboxes</h2>
                     <div class="flex gap-3">
-                        <button id="connectGmail" class="text-xs text-blue-400 hover:text-blue-300 cursor-pointer whitespace-nowrap">＋ Gmail</button>
-                        <button id="connectOutlook" class="text-xs text-blue-400 hover:text-blue-300 cursor-pointer whitespace-nowrap">＋ Outlook</button>
+                        <button id="connectGmail" class="text-xs font-semibold text-blue-400 hover:text-blue-300 cursor-pointer whitespace-nowrap">＋ Gmail</button>
+                        <button id="connectOutlook" class="text-xs font-semibold text-blue-400 hover:text-blue-300 cursor-pointer whitespace-nowrap">＋ Outlook</button>
                     </div>
                 </div>
                 <div id="accountList" class="space-y-2 overflow-y-auto min-h-0 flex-1"></div>
 
                 <div class="mt-4 pt-4 border-t border-slate-700/50 shrink-0">
                     <p id="userEmail" class="text-xs text-slate-400 truncate mb-2"></p>
-                    <button id="logout" class="text-xs text-slate-500 hover:text-white cursor-pointer">Sign out</button>
+                    <div class="flex items-center gap-4">
+                        <button data-open-settings class="text-xs font-semibold text-slate-300 hover:text-fg cursor-pointer">⚙️ Settings</button>
+                        <button id="logout" class="text-xs text-slate-500 hover:text-fg cursor-pointer">Sign out</button>
+                    </div>
                 </div>
             </div>
         </aside>
         <div id="sidebarBackdrop" class="fixed inset-0 bg-black/60 z-40" aria-hidden="true"></div>
 
-        <main class="flex-1 flex flex-col h-full min-w-0 relative bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-800/40 via-slate-900 to-slate-900">
+        <main class="flex-1 flex flex-col h-full min-w-0 relative">
 
-            <nav class="flex items-center border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-md p-2 sm:p-3 gap-1.5 sm:gap-3 z-10 px-3 sm:px-6 shrink-0">
-                <button id="menuBtn" class="lg:hidden w-10 h-10 shrink-0 rounded-lg text-slate-300 hover:bg-slate-800 flex items-center justify-center cursor-pointer" aria-label="Open menu" aria-controls="sidebar">
+            <nav class="flex items-center border-b border-slate-700/50 bg-slate-900/40 backdrop-blur-xl p-2 sm:p-3 gap-1.5 sm:gap-3 z-10 px-3 sm:px-6 shrink-0" role="tablist">
+                <button id="menuBtn" class="icon-btn lg:hidden" aria-label="Open menu" aria-controls="sidebar">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
                 </button>
-                <button id="tab-dashboard" class="btn-active px-3 sm:px-5 py-2 rounded-lg text-sm font-medium transition cursor-pointer whitespace-nowrap">📊 <span class="hidden sm:inline">Command Center</span><span class="sm:hidden">Home</span></button>
-                <button id="tab-activity" class="btn-inactive px-3 sm:px-5 py-2 rounded-lg text-sm font-medium transition cursor-pointer whitespace-nowrap">📅 Activity</button>
-                <span id="syncStatus" class="ml-auto self-center text-xs font-medium text-slate-500"></span>
+                <button id="tab-dashboard" class="btn-active px-3 sm:px-5 py-2 rounded-lg text-sm font-semibold transition cursor-pointer whitespace-nowrap">🏠 <span class="hidden sm:inline">Command Center</span><span class="sm:hidden">Home</span></button>
+                <button id="tab-activity" class="btn-inactive px-3 sm:px-5 py-2 rounded-lg text-sm font-semibold transition cursor-pointer whitespace-nowrap">📅 <span class="hidden min-[360px]:inline">Activity</span></button>
+                <span id="syncStatus" class="ml-auto self-center text-xs font-medium text-slate-500" aria-live="polite"></span>
+                <button id="themeToggle" class="icon-btn ml-auto sm:ml-0" aria-label="Switch between light and dark" title="Switch between light and dark">
+                    <svg class="icon-sun w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg>
+                    <svg class="icon-moon w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg>
+                </button>
+                <button data-open-settings class="icon-btn" aria-label="Settings" title="Settings">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                </button>
             </nav>
 
             <!-- Command Center -->
             <div id="view-dashboard" class="flex-1 p-3 sm:p-6 flex flex-col xl:flex-row gap-4 xl:gap-6 overflow-y-auto xl:overflow-hidden min-h-0">
-                <div class="w-full xl:w-3/5 flex flex-col gap-4 xl:gap-6 min-w-0 xl:min-h-0">
-                    <div id="connectPrompt" class="hidden glass-card p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-blue-500/30">
+                <div class="w-full xl:w-3/5 flex flex-col gap-4 xl:gap-6 min-w-0 xl:min-h-0 xl:overflow-y-auto xl:pr-1">
+
+                    <div id="hero">
+                        <h2 id="heroTitle" class="text-2xl sm:text-3xl font-extrabold tracking-tight text-fg">Hey there</h2>
+                        <p id="heroSub" class="text-sm text-slate-300 mt-1">Loading your day...</p>
+                    </div>
+
+                    <div id="connectPrompt" class="hidden glass-card p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                            <p class="font-semibold text-white">Connect your first mailbox</p>
+                            <p class="font-bold text-fg">Connect your first mailbox 💌</p>
                             <p class="text-sm text-slate-400">We'll rank your mail and turn deadlines into calendar items. Read-only access.</p>
                         </div>
                         <div class="flex flex-wrap gap-2">
                             <button id="connectGmailCta" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2.5 px-4 rounded-lg whitespace-nowrap cursor-pointer">Connect Gmail</button>
-                            <button id="connectOutlookCta" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-sm font-medium py-2.5 px-4 rounded-lg whitespace-nowrap cursor-pointer">Connect Outlook</button>
+                            <button id="connectOutlookCta" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-sm font-semibold py-2.5 px-4 rounded-lg whitespace-nowrap cursor-pointer">Connect Outlook</button>
                         </div>
                     </div>
 
                     <div id="accountFilter" class="hidden flex-wrap items-center gap-2" role="group" aria-label="Filter by mailbox"></div>
 
-                    <div class="glass-card p-4 sm:p-6 flex justify-between items-center gap-3">
-                        <div>
-                            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Emails</p>
-                            <p class="text-2xl sm:text-4xl font-bold text-white" id="kpi-total">0</p>
+                    <div id="card-focus" class="glass-card"></div>
+
+                    <div id="kpiGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3"></div>
+
+                    <div id="chartRow" class="flex flex-col md:flex-row gap-4 xl:gap-6">
+                        <div id="card-priorityMix" class="glass-card p-4 flex-1 flex flex-col relative min-h-[260px]">
+                            <p class="text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2">Priority mix</p>
+                            <div class="relative flex-1 w-full"><div id="pieChart" class="absolute inset-0"></div></div>
                         </div>
-                        <div class="h-10 w-px bg-slate-700"></div>
-                        <div>
-                            <p class="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Action Required</p>
-                            <p class="text-2xl sm:text-4xl font-bold text-red-400" id="kpi-urgent">0</p>
-                        </div>
-                        <div class="h-10 w-px bg-slate-700"></div>
-                        <div>
-                            <p class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Important</p>
-                            <p class="text-2xl sm:text-4xl font-bold text-emerald-400" id="kpi-important">0</p>
+                        <div id="card-volume" class="glass-card p-4 flex-1 flex flex-col relative min-h-[260px]">
+                            <p class="text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2">Volume timeline</p>
+                            <div class="relative flex-1 w-full"><div id="lineChart" class="absolute inset-0"></div></div>
                         </div>
                     </div>
 
-                    <div class="flex flex-col md:flex-row gap-4 xl:gap-6 xl:flex-1 xl:min-h-0">
-                        <div class="glass-card p-4 flex-1 flex flex-col relative min-h-[260px]">
-                            <p class="text-xs font-bold text-slate-400 uppercase mb-2">Priority Distribution</p>
-                            <div class="relative flex-1 w-full"><div id="pieChart" class="absolute inset-0"></div></div>
+                    <div id="insightRow" class="grid grid-cols-1 md:grid-cols-2 gap-4 xl:gap-6">
+                        <div id="card-senders" class="glass-card p-4">
+                            <p class="text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-1">Top senders</p>
+                            <div id="sendersList"></div>
                         </div>
-                        <div class="glass-card p-4 flex-1 flex flex-col relative min-h-[260px]">
-                            <p class="text-xs font-bold text-slate-400 uppercase mb-2">Volume Timeline</p>
-                            <div class="relative flex-1 w-full"><div id="lineChart" class="absolute inset-0"></div></div>
+                        <div id="card-mailboxes" class="glass-card p-4 hidden">
+                            <p class="text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-1">Mailboxes</p>
+                            <div id="mailboxList"></div>
                         </div>
+                    </div>
+
+                    <div id="card-busyHours" class="glass-card p-4 hidden flex-col min-h-[240px]">
+                        <p class="text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2">Busiest hours</p>
+                        <div class="relative flex-1 w-full min-h-[180px]"><div id="busyChart" class="absolute inset-0"></div></div>
                     </div>
                 </div>
 
                 <div class="w-full xl:w-2/5 glass-card flex flex-col min-w-0 h-[28rem] xl:h-auto shrink-0 xl:shrink xl:min-h-0">
-                    <div class="p-5 border-b border-slate-700/50 bg-slate-800/50 rounded-t-xl">
-                        <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">⚡ Immediate Action Items</h3>
+                    <div class="px-5 py-4 border-b border-slate-700/50">
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 class="text-sm font-extrabold text-fg tracking-tight">Up next</h3>
+                            <span id="taskCount" class="text-xs font-bold text-slate-400 bg-slate-700/40 rounded-full px-2.5 py-0.5 tabular-nums">0</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-0.5">Action items from your mail, most urgent first</p>
                     </div>
                     <div id="taskList" class="flex-1 overflow-y-auto p-3 space-y-2">
                         <div class="flex items-center justify-center h-full text-slate-500 text-sm">Loading…</div>
@@ -193,11 +241,16 @@
             <div id="view-activity" class="hidden flex-1 flex-col xl:flex-row p-3 sm:p-6 gap-4 xl:gap-6 overflow-y-auto xl:overflow-hidden min-h-0">
                 <div class="glass-card xl:flex-1 flex flex-col min-w-0 xl:min-h-0 p-2 sm:p-4 shrink-0 xl:shrink">
                     <div class="flex flex-wrap items-center gap-2 mb-3 shrink-0">
-                        <button id="monthPrev" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 cursor-pointer" aria-label="Previous month">‹</button>
-                        <button id="monthNext" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 cursor-pointer" aria-label="Next month">›</button>
-                        <button id="monthToday" class="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 cursor-pointer">Today</button>
-                        <h2 id="monthLabel" class="text-base sm:text-lg font-semibold text-white ml-1 sm:ml-2"></h2>
-                        <button id="activityAdd" class="ml-auto bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-3 sm:px-4 h-8 rounded-lg cursor-pointer whitespace-nowrap">＋ <span class="hidden sm:inline">New activity</span><span class="sm:hidden">New</span></button>
+                        <button id="monthPrev" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 cursor-pointer" aria-label="Previous month">‹</button>
+                        <button id="monthNext" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 cursor-pointer" aria-label="Next month">›</button>
+                        <button id="monthToday" class="px-3 h-8 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-300 cursor-pointer">Today</button>
+                        <h2 id="monthLabel" class="text-base sm:text-lg font-extrabold tracking-tight text-fg ml-1 sm:ml-2"></h2>
+                        <div class="seg order-last w-full sm:order-none sm:w-auto sm:ml-auto sm:mr-1" role="group" aria-label="Calendar view">
+                            <button type="button" data-cal-view="day" aria-pressed="false">Day</button>
+                            <button type="button" data-cal-view="week" aria-pressed="false">Week</button>
+                            <button type="button" data-cal-view="month" aria-pressed="false">Month</button>
+                        </div>
+                        <button id="activityAdd" class="ml-auto sm:ml-0 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-3 sm:px-4 h-8 rounded-lg cursor-pointer whitespace-nowrap">＋ <span class="hidden sm:inline">New activity</span><span class="sm:hidden">New</span></button>
                     </div>
                     <div id="weekdayRow" class="grid grid-cols-7 shrink-0"></div>
                     <div id="calendarGrid" class="grid grid-cols-7 grid-rows-6 xl:flex-1 h-[26rem] sm:h-[34rem] xl:h-auto xl:min-h-0"></div>
@@ -205,16 +258,16 @@
 
                 <div class="w-full xl:w-80 flex flex-col gap-4 xl:min-h-0 shrink-0">
                     <div class="glass-card flex flex-col xl:flex-1 xl:min-h-0 max-h-72 xl:max-h-none">
-                        <div class="p-4 border-b border-slate-700/50 bg-slate-800/50 rounded-t-xl flex items-center justify-between shrink-0">
-                            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">Unscheduled</h3>
-                            <span id="backlogCount" class="text-xs text-slate-400">0</span>
+                        <div class="px-4 py-3.5 border-b border-slate-700/50 flex items-center justify-between shrink-0">
+                            <h3 class="text-sm font-extrabold text-fg tracking-tight">📌 Unscheduled</h3>
+                            <span id="backlogCount" class="text-xs font-semibold text-slate-400">0</span>
                         </div>
                         <div id="backlogList" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
                     </div>
                     <div class="glass-card p-4 shrink-0">
-                        <p class="text-sm font-semibold text-white mb-1">Use in your calendar app</p>
+                        <p class="text-sm font-bold text-fg mb-1">Use in your calendar app 📆</p>
                         <p class="text-xs text-slate-400 mb-3">Subscribe once and your deadlines show up in Google, Outlook or Apple Calendar.</p>
-                        <button id="feedOpen" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-sm py-2 rounded-lg cursor-pointer">Get calendar link</button>
+                        <button id="feedOpen" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-sm font-semibold py-2 rounded-lg cursor-pointer">Get calendar link</button>
                     </div>
                 </div>
             </div>
@@ -223,15 +276,15 @@
         <!-- Email drawer -->
         <div id="drawerBackdrop" class="hidden fixed inset-0 bg-black/50 z-40"></div>
         <aside id="drawer" class="fixed top-0 right-0 h-full w-full max-w-2xl bg-slate-900 border-l border-slate-700/50 shadow-2xl z-50 flex flex-col translate-x-full transition-transform duration-300">
-            <button id="drawerClose" class="absolute top-2 right-2 sm:top-4 sm:right-4 w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white text-xl cursor-pointer z-10" aria-label="Close">✕</button>
+            <button id="drawerClose" class="absolute top-2 right-2 sm:top-4 sm:right-4 w-10 h-10 flex items-center justify-center text-slate-400 hover:text-fg text-xl cursor-pointer z-10" aria-label="Close">✕</button>
             <div id="drawerContent" class="flex flex-col h-full min-h-0"></div>
         </aside>
     </div>
 
     <!-- Add / edit activity -->
     <div id="activityModal" class="hidden flex fixed inset-0 bg-black/60 z-[60] items-center justify-center p-4">
-        <form id="activityForm" class="glass-card bg-slate-900 w-full max-w-md p-4 sm:p-6 space-y-3 max-h-[92dvh] overflow-y-auto">
-            <h2 id="dialogTitle" class="text-lg font-semibold text-white">New activity</h2>
+        <form id="activityForm" class="glass-card modal-card w-full max-w-md p-4 sm:p-6 space-y-3 max-h-[92dvh] overflow-y-auto">
+            <h2 id="dialogTitle" class="text-lg font-extrabold tracking-tight text-fg">New activity</h2>
             <input name="title" required maxlength="255" placeholder="What needs doing?" class="field">
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <label class="col-span-full text-[11px] text-slate-500 -mb-1">When (leave the date empty to keep it unscheduled; leave the times empty for an all-day item)</label>
@@ -241,12 +294,12 @@
             </div>
             <textarea name="notes" rows="4" maxlength="5000" placeholder="Notes" class="field resize-y"></textarea>
             <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                <input name="done" type="checkbox" class="w-4 h-4"> Mark as done
+                <input name="done" type="checkbox" class="w-4 h-4 accent-[hsl(var(--brand-h)_92%_60%)]"> Mark as done
             </label>
             <p id="activitySource" class="text-xs text-slate-500"></p>
             <div class="flex items-center gap-2 pt-2">
                 <button type="button" id="activityDelete" class="hidden text-sm text-red-400 hover:text-red-300 cursor-pointer">Delete</button>
-                <button type="button" id="activityCancel" class="ml-auto text-sm text-slate-400 hover:text-white px-3 py-2 cursor-pointer">Cancel</button>
+                <button type="button" id="activityCancel" class="ml-auto text-sm text-slate-400 hover:text-fg px-3 py-2 cursor-pointer">Cancel</button>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-5 py-2 rounded-lg cursor-pointer">Save</button>
             </div>
         </form>
@@ -254,8 +307,8 @@
 
     <!-- Calendar feed link -->
     <div id="feedModal" class="hidden flex fixed inset-0 bg-black/60 z-[60] items-center justify-center p-4">
-        <div class="glass-card bg-slate-900 w-full max-w-lg p-4 sm:p-6 space-y-3 max-h-[92dvh] overflow-y-auto">
-            <h2 class="text-lg font-semibold text-white">Your calendar link</h2>
+        <div class="glass-card modal-card w-full max-w-lg p-4 sm:p-6 space-y-3 max-h-[92dvh] overflow-y-auto">
+            <h2 class="text-lg font-extrabold tracking-tight text-fg">Your calendar link</h2>
             <p class="text-sm text-slate-400">In Google Calendar choose <em>Other calendars → From URL</em>; in Outlook, <em>Add calendar → Subscribe from web</em>. Anyone with this link can see your scheduled items, so keep it private.</p>
             <div class="flex gap-2">
                 <input id="feedUrl" readonly class="field font-mono text-xs">
@@ -263,7 +316,87 @@
             </div>
             <div class="flex items-center pt-2">
                 <button id="feedRotate" class="text-xs text-red-400 hover:text-red-300 cursor-pointer">Create a new link (invalidates this one)</button>
-                <button id="feedClose" class="ml-auto text-sm text-slate-400 hover:text-white px-3 py-2 cursor-pointer">Close</button>
+                <button id="feedClose" class="ml-auto text-sm text-slate-400 hover:text-fg px-3 py-2 cursor-pointer">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings -->
+    <div id="settingsModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="glass-card modal-card w-full max-w-lg max-h-[92dvh] overflow-y-auto p-5 sm:p-6 space-y-6">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h2 id="settingsTitle" class="text-xl font-extrabold tracking-tight text-fg">Settings ⚙️</h2>
+                    <p class="text-xs text-slate-400 mt-1">Saved on this device. Make it yours.</p>
+                </div>
+                <button id="settingsClose" class="icon-btn -mt-1 -mr-2" aria-label="Close settings">✕</button>
+            </div>
+
+            <section class="space-y-3">
+                <h3 class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Appearance</h3>
+
+                <div class="space-y-2">
+                    <p class="text-sm font-semibold text-fg">Theme</p>
+                    <div class="seg" role="group" aria-label="Theme">
+                        <button type="button" data-pref="theme" data-value="system" aria-pressed="false">🖥️ System</button>
+                        <button type="button" data-pref="theme" data-value="light" aria-pressed="false">☀️ Light</button>
+                        <button type="button" data-pref="theme" data-value="dark" aria-pressed="false">🌙 Dark</button>
+                    </div>
+                    <p id="themeHint" class="text-xs text-slate-400"></p>
+                </div>
+
+                <div class="space-y-2">
+                    <p class="text-sm font-semibold text-fg">Accent colour</p>
+                    <div class="flex items-center gap-2.5" role="group" aria-label="Accent colour">
+                        <button type="button" class="swatch" style="--sw: 262" data-pref="accent" data-value="violet" aria-pressed="false" aria-label="Violet"></button>
+                        <button type="button" class="swatch" style="--sw: 330" data-pref="accent" data-value="pink" aria-pressed="false" aria-label="Pink"></button>
+                        <button type="button" class="swatch" style="--sw: 217" data-pref="accent" data-value="blue" aria-pressed="false" aria-label="Blue"></button>
+                        <button type="button" class="swatch" style="--sw: 160" data-pref="accent" data-value="mint" aria-pressed="false" aria-label="Mint"></button>
+                        <button type="button" class="swatch" style="--sw: 24" data-pref="accent" data-value="sunset" aria-pressed="false" aria-label="Sunset"></button>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <p class="text-sm font-semibold text-fg">Text size</p>
+                    <div class="seg" role="group" aria-label="Text size">
+                        <button type="button" data-pref="density" data-value="compact" aria-pressed="false">Compact</button>
+                        <button type="button" data-pref="density" data-value="comfortable" aria-pressed="false">Comfy</button>
+                        <button type="button" data-pref="density" data-value="roomy" aria-pressed="false">Roomy</button>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <p class="text-sm font-semibold text-fg">Animations</p>
+                    <div class="seg" role="group" aria-label="Animations">
+                        <button type="button" data-pref="motion" data-value="auto" aria-pressed="false">Auto</button>
+                        <button type="button" data-pref="motion" data-value="full" aria-pressed="false">Full</button>
+                        <button type="button" data-pref="motion" data-value="reduced" aria-pressed="false">Reduced</button>
+                    </div>
+                    <p class="text-xs text-slate-400">Auto follows your device's "reduce motion" setting.</p>
+                </div>
+            </section>
+
+            <section class="space-y-3">
+                <h3 class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Dashboard</h3>
+                <p class="text-xs text-slate-400">Choose what your home screen shows. <span id="kpiCount"></span></p>
+                <div id="dashPrefs" class="space-y-4"></div>
+            </section>
+
+            <section class="space-y-3">
+                <h3 class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Inbox</h3>
+                <div class="space-y-2">
+                    <label for="prefTimeframe" class="text-sm font-semibold text-fg">Default timeframe</label>
+                    <select id="prefTimeframe" class="field cursor-pointer">
+                        <option value="Last 1 Day">Last 24 hours</option>
+                        <option value="Last 1 Week">Last 7 days</option>
+                        <option value="Last 1 Month">Last 30 days</option>
+                    </select>
+                </div>
+            </section>
+
+            <div class="flex items-center gap-2 pt-1">
+                <button id="settingsReset" type="button" class="text-xs font-semibold text-slate-400 hover:text-fg cursor-pointer">Reset to defaults</button>
+                <button id="settingsDone" type="button" class="ml-auto bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-6 py-2.5 rounded-lg cursor-pointer">Done</button>
             </div>
         </div>
     </div>

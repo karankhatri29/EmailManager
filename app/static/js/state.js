@@ -1,10 +1,11 @@
 // The single source of truth the views render from.
 
+// Filled from the theme's CSS variables by js/settings.js (they differ between light and dark).
 export const CATEGORY_COLORS = {
-    'Urgent / Action Required': '#ef4444',
-    'Important': '#10b981',
-    'Promotional': '#64748b',
-    'General': '#3b82f6',
+    'Urgent / Action Required': '#ff6b81',
+    'Important': '#34e0a1',
+    'Promotional': '#948fbd',
+    'General': '#a78bfa',
 };
 
 export const state = {
@@ -12,8 +13,11 @@ export const state = {
     accounts: [],
     accountFilter: null, // null = every mailbox, otherwise one account id
     emails: [],
+    tasks: [], // action items from /api/scheduler, most urgent first
+    dashActivities: null, // scheduled tasks around today for the dashboard numbers (null = could not load)
     activities: [],
     selectedEmailId: null,
-    month: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // month shown in the calendar
+    calAnchor: new Date(), // any date inside the range the calendar is showing (day / week / month)
+    calViewOverride: null, // null = the view is chosen from the screen size; else 'day' | 'week' | 'month'
     timeframe: 'Last 1 Day',
 };

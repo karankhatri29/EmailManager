@@ -1,10 +1,12 @@
 // Entry point: sign-in gate, tabs, sync polling. Each view lives in its own module.
 
 import { loadActivities, initActivity } from './activity.js';
-import { initAccounts, loadAccounts } from './accounts.js';
+import { initAccounts, loadAccounts, renderAccountFilter } from './accounts.js';
 import { setUnauthorizedHandler, api } from './api.js';
 import { initAuth, logout } from './auth.js';
-import { initDashboard, loadEmails, renderCharts } from './dashboard.js';
+import { initDashboard, loadEmails, openEmailDrawer, renderCharts } from './dashboard.js';
+import { initKpis } from './kpis.js';
+import { getPrefs, initSettings } from './settings.js';
 import { state } from './state.js';
 import { $, show, toast } from './util.js';
 
@@ -48,6 +50,12 @@ function setSyncStatus(html, cls) {
     const el = $('syncStatus');
     el.className = `ml-auto self-center text-xs font-medium ${cls}`;
     el.innerHTML = html;
+    // Phones hide the top-bar copy; the menu shows this one instead.
+    const side = $('syncStatusSide');
+    if (side) {
+        side.className = `sm:hidden text-xs font-medium mb-4 min-h-[1rem] ${cls}`;
+        side.innerHTML = html;
+    }
 }
 
 async function refreshEverything({ silent = true } = {}) {
@@ -154,6 +162,28 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     initDashboard();
     initActivity();
+    initKpis({
+        openEmail: openEmailDrawer,
+        goActivity: () => switchTab('activity'),
+        refreshActivities: loadActivities,
+        filterAccount: async (id) => { // clicking a mailbox in the breakdown shows just that mailbox
+            state.accountFilter = id;
+            renderAccountFilter();
+            await loadEmails();
+        },
+    });
+
+    // Settings (theme, accent, ...) are applied when settings.js loads; here we wire the dialog and the
+    // saved default timeframe.
+    state.timeframe = getPrefs().timeframe;
+    $('timeFilter').value = state.timeframe;
+    initSettings({
+        onTimeframeChange: async (timeframe) => {
+            state.timeframe = timeframe;
+            $('timeFilter').value = timeframe;
+            await loadEmails();
+        },
+    });
 
     $('tab-dashboard').addEventListener('click', () => switchTab('dashboard'));
     $('tab-activity').addEventListener('click', () => switchTab('activity'));
