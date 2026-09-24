@@ -26,3 +26,8 @@ htmlcov/
 .DS_Store
 .env.*
 !.env.example
+
+# SQLite side files and local backups (a backup can hold readable mail)
+*.db-shm
+*.db-wal
+*.bak-*
