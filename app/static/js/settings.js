@@ -48,7 +48,15 @@ function load() {
         // dashboard switches: keep only ids that still exist, in catalog order
         const keep = (catalog, ids) => catalog.filter((item) => ids.includes(item.id)).map((item) => item.id);
         if (Array.isArray(saved.kpis)) prefs.kpis = keep(KPI_CATALOG, saved.kpis);
-        if (Array.isArray(saved.widgets)) prefs.widgets = keep(WIDGET_CATALOG, saved.widgets);
+        // Widgets added after someone saved their choices are switched on once (they can turn them off).
+        const NEW_WIDGETS_SINCE = { trips: 3 };
+        const seenVersion = Number(saved.dashV) || 0;
+        if (Array.isArray(saved.widgets)) {
+            // The donut and line charts became the Inbox explorer: carry the choice over.
+            const old = saved.widgets.filter((id) => id === 'priorityMix' || id === 'volume');
+            const added = Object.entries(NEW_WIDGETS_SINCE).filter(([, v]) => seenVersion < v).map(([id]) => id);
+            prefs.widgets = keep(WIDGET_CATALOG, [...saved.widgets, ...(old.length ? ['inbox'] : []), ...added]);
+        }
     } catch {
         // storage blocked or corrupted: fall back to the defaults
     }
@@ -56,7 +64,7 @@ function load() {
 
 function save() {
     try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...prefs, dashV: 3 }));
     } catch {
         // private mode / storage full: the settings still apply for this visit
     }

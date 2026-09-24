@@ -24,7 +24,6 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
-from sqlalchemy.pool import StaticPool  # noqa: E402
 
 from app.api.deps import get_sync_manager  # noqa: E402
 from app.core.security import login_limiter  # noqa: E402
@@ -45,9 +44,15 @@ PASSWORD = "correct-horse-battery"
 
 
 @pytest.fixture
-def session_factory():
-    """Fresh in-memory SQLite database per test (with foreign keys enforced, like Postgres)."""
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+def session_factory(tmp_path):
+    """Fresh SQLite database per test (with foreign keys enforced, like Postgres).
+
+    A file rather than one shared in-memory connection: background syncs run in threads, and threads sharing
+    a single connection would roll each other's transactions back.
+    """
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'test.db'}", connect_args={"check_same_thread": False, "timeout": 30}
+    )
     enable_sqlite_foreign_keys(engine)
     Base.metadata.create_all(engine)
     yield sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)

@@ -5,7 +5,9 @@ import { initAccounts, loadAccounts, renderAccountFilter } from './accounts.js';
 import { setUnauthorizedHandler, api } from './api.js';
 import { initAuth, logout } from './auth.js';
 import { initDashboard, loadEmails, openEmailDrawer, renderCharts } from './dashboard.js';
+import { initExplorer } from './explorer.js';
 import { initKpis } from './kpis.js';
+import { initTrips, loadTrips } from './trips.js';
 import { getPrefs, initSettings } from './settings.js';
 import { state } from './state.js';
 import { $, show, toast } from './util.js';
@@ -32,7 +34,13 @@ function showApp() {
 }
 
 function switchTab(name) {
-    const tabs = { dashboard: 'view-dashboard', activity: 'view-activity' };
+    const tabs = { dashboard: 'view-dashboard', activity: 'view-activity', trips: 'view-trips' };
+    // The bottom bar (phone) and rail (tablet) mirror the tabs, and the top bar shows the page title.
+    $('pageTitle').textContent = { activity: 'Activity', trips: 'Trips' }[name] || 'Home';
+    document.querySelectorAll('[data-nav]').forEach((item) => {
+        if (item.dataset.nav === name) item.setAttribute('aria-current', 'page');
+        else item.removeAttribute('aria-current');
+    });
     for (const [tab, viewId] of Object.entries(tabs)) {
         const active = tab === name;
         show($(viewId), active);
@@ -42,6 +50,7 @@ function switchTab(name) {
     }
     if (name === 'dashboard') renderCharts();
     if (name === 'activity') loadActivities();
+    if (name === 'trips') loadTrips().catch(() => {});
 }
 
 // --- background sync status ----------------------------------------------------------------------
@@ -59,12 +68,13 @@ function setSyncStatus(html, cls) {
 }
 
 async function refreshEverything({ silent = true } = {}) {
-    await Promise.all([loadEmails({ silent }), loadAccounts(), loadActivities()]);
+    await Promise.all([loadEmails({ silent }), loadAccounts(), loadActivities(), loadTrips().catch(() => {})]);
 }
 
 async function pollSync() {
     try {
         const s = await api('/api/sync/status');
+        document.querySelectorAll('[data-action="sync"]').forEach((item) => item.classList.toggle('is-syncing', s.syncing));
 
         if (s.syncing) {
             setSyncStatus('<span class="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse mr-2"></span>Syncing in background…', 'text-blue-400');
@@ -126,6 +136,7 @@ async function startApp(user) {
 
     await loadAccounts();
     await Promise.all([loadEmails(), loadActivities()]); // instant: served from the database
+    loadTrips().catch(() => {}); // starts the ticket scan if this mailbox has not been scanned lately
     await pollSync();
     clearInterval(pollTimer);
     pollTimer = setInterval(pollSync, POLL_MS);
@@ -142,6 +153,21 @@ async function boot() {
 // Below 1024px the sidebar is an off-canvas drawer (opened from the menu button); above it, a column
 // that can be collapsed. The CSS for both lives in index.html and keys off these two classes.
 const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
+
+// Which layout is active: phone / tablet / laptop / desktop (see css/adaptive.css).
+export function uiMode(width = window.innerWidth) {
+    if (width < 640) return 'phone';
+    if (width < 1024) return 'tablet';
+    return width < 1536 ? 'laptop' : 'desktop';
+}
+const applyUiMode = () => { document.documentElement.dataset.ui = uiMode(); };
+
+// The 24h / 7d / 30d chips on the dashboard mirror the timeframe.
+function syncTimeChips() {
+    document.querySelectorAll('[data-timeframe]').forEach((chip) => {
+        chip.setAttribute('aria-pressed', String(chip.dataset.timeframe === state.timeframe));
+    });
+}
 
 function setDrawer(open) {
     $('sidebar').classList.toggle('open', open);
@@ -162,6 +188,9 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     initDashboard();
     initActivity();
+    initExplorer({ openEmail: openEmailDrawer });
+    initTrips({ openEmail: (id, email) => openEmailDrawer(id, email), goTrips: () => switchTab('trips') });
+    document.addEventListener('taskschanged', () => loadActivities()); // a task added from the inbox shows in the calendar
     initKpis({
         openEmail: openEmailDrawer,
         goActivity: () => switchTab('activity'),
@@ -181,13 +210,30 @@ document.addEventListener('DOMContentLoaded', () => {
         onTimeframeChange: async (timeframe) => {
             state.timeframe = timeframe;
             $('timeFilter').value = timeframe;
+            syncTimeChips();
             await loadEmails();
         },
     });
 
     $('tab-dashboard').addEventListener('click', () => switchTab('dashboard'));
     $('tab-activity').addEventListener('click', () => switchTab('activity'));
+    $('tab-trips').addEventListener('click', () => switchTab('trips'));
     $('syncNow').addEventListener('click', syncNow);
+
+    // Phone bottom bar and tablet rail.
+    document.querySelectorAll('[data-nav]').forEach((item) => item.addEventListener('click', () => switchTab(item.dataset.nav)));
+    document.querySelectorAll('[data-action="sync"]').forEach((item) => item.addEventListener('click', syncNow));
+    document.querySelectorAll('[data-action="menu"]').forEach((item) => item.addEventListener('click', () => setDrawer(true)));
+    document.querySelectorAll('[data-timeframe]').forEach((chip) => chip.addEventListener('click', () => {
+        $('timeFilter').value = chip.dataset.timeframe;
+        $('timeFilter').dispatchEvent(new Event('change'));
+    }));
+    syncTimeChips();
+    applyUiMode();
+    for (const query of ['(min-width: 640px)', '(min-width: 1024px)', '(min-width: 1536px)']) {
+        window.matchMedia(query).addEventListener('change', () => { applyUiMode(); renderCharts(); });
+    }
+
     $('sidebarToggle').addEventListener('click', toggleSidebar);
     $('menuBtn').addEventListener('click', () => setDrawer(true));
     $('sidebarBackdrop').addEventListener('click', () => setDrawer(false));
@@ -195,6 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.matchMedia('(min-width: 1024px)').addEventListener('change', () => { setDrawer(false); renderCharts(); });
     $('timeFilter').addEventListener('change', async (event) => {
         state.timeframe = event.target.value;
+        syncTimeChips();
         if (!isDesktop()) setDrawer(false);
         await loadEmails();
     });

@@ -72,14 +72,46 @@ The periodic sync runs inside the API process by default. Then: create an accoun
 
 ### Dashboard and settings
 The home screen leads with a "Do this first" card, then key numbers (needs action, overdue, due today, next 7 days,
-on-time completion, emails received), priority and volume charts, top senders and a per-mailbox breakdown. Numbers
-are colour-coded by threshold (red overdue, orange due today, blue upcoming, green fine). Everything is computed in
+on-time completion, emails received), the **Inbox explorer**, top senders and a per-mailbox breakdown. Numbers are
+colour-coded by threshold (red overdue, orange due today, blue upcoming, green fine). Everything is computed in
 the browser from data the app already stores.
+
+The **Inbox explorer** is one interactive card: priority chips with live counts (and a mix bar that is a control
+too), a clickable stacked-bar timeline (hours for 24h, days for 7 / 30 days), search, a Smart / Newest sort and the
+email list. Every control narrows the same list and the others update to match. Tapping a sender in *Top senders*
+or the *Needs action* number drills into it, and any email can become a task with the **+ Task** button.
 
 **Settings** (gear icon, saved per device in the browser): theme (System / Light / Dark; System follows the
 device live), accent colour, text size, animations, default timeframe, and switches for every dashboard number
-and widget (10 numbers and 6 widgets to choose from). The calendar picks Day / Week / Month from the screen size,
+and widget (10 numbers and 4 widgets to choose from). The calendar picks Day / Week / Month from the screen size,
 and the toolbar overrides it for the current visit.
+
+### Trips and tickets
+Flights, trains, buses, movies (BookMyShow, PVR, INOX...), events and hotel stays are found in your mail and shown
+as boarding-pass style cards on the **Trips** tab, with a "Coming up" card on the home screen. Each card shows the
+route or title, the date and time with a countdown, the PNR / booking id (tap to copy), seats, class, passengers and
+so on, and can be opened, added to a calendar app as an `.ics`, or added to the Activity calendar.
+
+How it works (`services/bookings.py`, `services/booking_scan.py`, `api/bookings.py`):
+- A rule-based parser reads the sender, subject and labelled lines ("PNR:", "Date of Journey:", "Seats:"). It
+  ignores promotions, OTPs and "rate your trip" mails, notes cancellations and changes, keeps only the latest mail
+  about a trip, and leaves a field out when it cannot find it instead of guessing.
+- Ticket mails are usually older than the inbox window and long, so a separate background scan searches up to 180
+  days back (Gmail search / Microsoft Graph search), reads each hit in full and stores it like any other email. It
+  runs when the Trips tab is opened for a mailbox not scanned in the last 6 hours, or on demand with **Scan my mail**.
+- Times on tickets have no time zone, so they are shown as written. Matching is tuned to typical confirmation
+  layouts; a mail in an unusual layout may show with fewer fields or not be found, and **Open email** always shows
+  the original.
+
+### Layouts by screen size
+The UI is arranged differently for each kind of screen (`static/css/adaptive.css`; `<html data-ui>` records which):
+
+| Screen | Navigation | Dashboard |
+|---|---|---|
+| Phone (< 640px) | floating bottom tab bar | swipeable KPI carousel, timeframe chips, dialogs as bottom sheets |
+| Tablet (640-1023px) | slim icon rail | 3-up KPI grid, stacked cards |
+| Laptop (1024-1535px) | sidebar + top tabs | two columns (numbers/charts, up next) |
+| Desktop (>= 1536px) | sidebar + top tabs | wide main area with six KPIs in a row, up next on the right |
 
 ### Google OAuth setup
 Create an OAuth client in Google Cloud Console (APIs & Services → Credentials), enable the Gmail API, and either

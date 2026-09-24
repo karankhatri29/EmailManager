@@ -7,8 +7,10 @@
 import { api } from './api.js';
 import { providerLabel } from './accounts.js';
 import { KPI_CATALOG } from './dashboard-catalog.js';
+import { focusPriority, renderExplorer, setSender } from './explorer.js';
 import { cssVar, getDashPrefs } from './settings.js';
 import { CATEGORY_COLORS, state } from './state.js';
+import { renderTripsCard, upcomingTrips } from './trips.js';
 import { $, esc, localYmd, senderName, timeOf, toast } from './util.js';
 
 const URGENT = 'Urgent / Action Required';
@@ -92,7 +94,7 @@ const unavailable = (label, ic) => ({ label, value: '–', sub: 'Could not load 
 
 const TILES = {
     needsAction: (m) => ({
-        label: 'Needs action', value: m.urgent, icon: 'alert', go: 'list',
+        label: 'Needs action', value: m.urgent, icon: 'alert', go: 'inbox:Urgent / Action Required',
         sub: m.urgent ? 'Urgent emails to handle' : 'Nothing urgent',
         tone: m.urgent ? 'urgent' : 'good',
     }),
@@ -127,7 +129,7 @@ const TILES = {
         tone: 'brand',
     }),
     important: (m) => ({
-        label: 'Important mail', value: m.important, icon: 'star', go: 'list',
+        label: 'Important mail', value: m.important, icon: 'star', go: 'inbox:Important',
         sub: m.important ? 'Worth a look' : 'Nothing flagged', tone: 'good',
     }),
     unscheduled: (m) => !m.tasks ? unavailable('Unscheduled backlog', 'bookmark') : ({
@@ -239,6 +241,7 @@ async function markFocusDone(id) {
 
 // --- top senders ---------------------------------------------------------------------------------
 
+// Each sender is a button: tapping one filters the Inbox explorer to that sender.
 function renderSenders() {
     const groups = new Map();
     state.emails.forEach((e) => {
@@ -260,19 +263,19 @@ function renderSenders() {
         const dominant = Object.entries(g.cats).sort((a, b) => b[1] - a[1])[0][0];
         const noisy = dominant === 'Promotional' && g.count >= 3;
         return `
-        <div class="flex items-center gap-3 py-2">
+        <button type="button" data-sender="${esc(g.name)}" class="w-full text-left flex items-center gap-3 py-2 px-1 rounded-xl hover:bg-slate-700/30 cursor-pointer transition-colors">
             <span class="w-8 h-8 rounded-full bg-blue-500/15 text-blue-400 flex items-center justify-center text-xs font-bold shrink-0" aria-hidden="true">${esc(g.name.charAt(0).toUpperCase())}</span>
-            <div class="min-w-0 flex-1">
-                <div class="flex items-center justify-between gap-2">
+            <span class="min-w-0 flex-1">
+                <span class="flex items-center justify-between gap-2">
                     <span class="text-sm font-semibold text-fg truncate">${esc(g.name)}</span>
                     <span class="text-xs font-bold text-slate-300 tabular-nums">${g.count}</span>
-                </div>
-                <div class="h-1.5 rounded-full bg-slate-700/50 mt-1.5 overflow-hidden">
-                    <div class="h-full rounded-full" style="width:${Math.round((g.count / max) * 100)}%;background:${CATEGORY_COLORS[dominant] || 'currentColor'}"></div>
-                </div>
-                ${noisy ? '<p class="text-[11px] text-slate-400 mt-1">Mostly promotional. Worth unsubscribing?</p>' : ''}
-            </div>
-        </div>`;
+                </span>
+                <span class="block h-1.5 rounded-full bg-slate-700/50 mt-1.5 overflow-hidden">
+                    <span class="block h-full rounded-full" style="width:${Math.round((g.count / max) * 100)}%;background:${CATEGORY_COLORS[dominant] || 'currentColor'}"></span>
+                </span>
+                ${noisy ? '<span class="block text-[11px] text-slate-400 mt-1">Mostly promotional. Worth unsubscribing?</span>' : ''}
+            </span>
+        </button>`;
     }).join('');
 }
 
@@ -298,29 +301,6 @@ function renderMailboxes() {
         </button>`).join('');
 }
 
-// --- busiest hours chart -------------------------------------------------------------------------
-
-function renderBusyHours(m) {
-    if (!window.Plotly || $('card-busyHours').classList.contains('hidden')) return;
-    const brand = `hsl(${cssVar('--brand-h') || 262} 92% 62%)`;
-    Plotly.react('busyChart', [{
-        x: m.byHour.map((_, h) => hourLabel(h)),
-        y: m.byHour,
-        type: 'bar',
-        marker: { color: brand, opacity: 0.9 },
-        hovertemplate: '%{x}: %{y} emails<extra></extra>',
-    }], {
-        paper_bgcolor: 'rgba(0,0,0,0)',
-        plot_bgcolor: 'rgba(0,0,0,0)',
-        font: { color: cssVar('--chart-text'), family: 'Plus Jakarta Sans, Inter, sans-serif', size: 11 },
-        margin: { t: 10, b: 32, l: 30, r: 8 },
-        bargap: 0.25,
-        xaxis: { tickmode: 'array', tickvals: m.byHour.map((_, h) => hourLabel(h)).filter((_, h) => h % 3 === 0), showgrid: false },
-        yaxis: { gridcolor: cssVar('--chart-grid'), zeroline: false, rangemode: 'tozero', tickformat: 'd' },
-        showlegend: false,
-    }, { displayModeBar: false, responsive: true });
-}
-
 // --- assembling ----------------------------------------------------------------------------------
 
 // Which widgets are visible, from Settings (and from the data: the mailbox breakdown needs 2+ mailboxes).
@@ -332,14 +312,12 @@ function applyVisibility() {
     const show = (id, visible) => $(`card-${id}`).classList.toggle('hidden', !visible);
 
     show('focus', on('focus'));
-    show('priorityMix', on('priorityMix'));
-    show('volume', on('volume'));
+    show('trips', on('trips') && upcomingTrips().length > 0);
+    show('inbox', on('inbox'));
     show('senders', on('senders'));
     show('mailboxes', on('mailboxes') && state.accounts.length > 1 && state.accountFilter === null);
-    show('busyHours', on('busyHours'));
 
     $('kpiGrid').classList.toggle('hidden', kpis.length === 0);
-    $('chartRow').classList.toggle('hidden', !(on('priorityMix') || on('volume')));
     $('insightRow').classList.toggle('hidden', !widgetOn('senders') && !widgetOn('mailboxes'));
 }
 
@@ -348,9 +326,10 @@ export function renderAll() {
     const m = computeMetrics();
     renderTiles(m);
     if (widgetOn('focus')) renderFocus(m);
+    if (widgetOn('trips')) renderTripsCard();
     if (widgetOn('senders')) renderSenders();
     if (widgetOn('mailboxes')) renderMailboxes();
-    renderBusyHours(m);
+    if (widgetOn('inbox')) renderExplorer();
     return m;
 }
 
@@ -360,7 +339,9 @@ export function initKpis(wiring) {
     $('kpiGrid').addEventListener('click', (event) => {
         const tile = event.target.closest('[data-kpi]');
         if (!tile || !tile.dataset.go) return;
-        if (tile.dataset.go === 'activity') hooks.goActivity();
+        const { go } = tile.dataset;
+        if (go === 'activity') hooks.goActivity();
+        else if (go.startsWith('inbox:') && widgetOn('inbox')) focusPriority(go.slice('inbox:'.length));
         else $('taskList').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
 
@@ -381,6 +362,14 @@ export function initKpis(wiring) {
         if (row) hooks.filterAccount(Number(row.dataset.account));
     });
 
-    // 'dashchange' (Settings switches) is handled in dashboard.js, which re-renders these and the charts.
-    document.addEventListener('themechange', () => renderBusyHours(computeMetrics()));
+    $('sendersList').addEventListener('click', (event) => {
+        const row = event.target.closest('[data-sender]');
+        if (row) setSender(row.dataset.sender);
+    });
+
+    // 'dashchange' (Settings switches) is handled in dashboard.js. A new task changes the task numbers.
+    document.addEventListener('taskschanged', async () => {
+        await loadDashActivities();
+        renderAll();
+    });
 }

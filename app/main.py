@@ -11,6 +11,7 @@ from .api import (
     accounts,
     activities,
     auth,
+    bookings,
     calendar,
     inbox,
     mail,
@@ -71,6 +72,7 @@ def create_app() -> FastAPI:
         todos,
         timetable,
         calendar,
+        bookings,
     ):
         app.include_router(module.router)
     return app
