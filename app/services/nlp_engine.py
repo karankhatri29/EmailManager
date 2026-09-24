@@ -1,18 +1,19 @@
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 import spacy
 
 MODEL_NAME = "en_core_web_sm"
+# The model ships inside the repository (about 15 MB, MIT licence) so every host, including serverless bundles,
+# has exactly the same one. Nothing is installed or downloaded at start-up.
+BUNDLED_MODEL = Path(__file__).resolve().parent.parent / "nlp_model" / MODEL_NAME
 
 
 def load_model():
-    """Loads the small English model.
-
-    spacy.load(name) finds the model through the installed package's metadata (its .dist-info folder). Some hosts,
-    such as serverless bundles, leave that folder out although the package itself is there, so importing the package
-    and calling its own load() is the fallback: it needs only the files. Nothing is downloaded at start-up.
-    """
+    """Loads the small English model: the copy bundled with the app first, then an installed one."""
+    if (BUNDLED_MODEL / "meta.json").exists():
+        return spacy.load(BUNDLED_MODEL)
     try:
         return spacy.load(MODEL_NAME)
     except OSError:
@@ -22,8 +23,8 @@ def load_model():
             return importlib.import_module(MODEL_NAME).load()
         except ImportError:
             raise RuntimeError(
-                f"The spaCy model {MODEL_NAME} is not installed. Install it with: pip install {MODEL_NAME} "
-                "(see requirements.txt for the exact wheel), or python -m spacy download " + MODEL_NAME
+                f"The spaCy model {MODEL_NAME} was not found (expected at {BUNDLED_MODEL}). "
+                f"Restore app/nlp_model or run: pip install {MODEL_NAME}"
             ) from None
 
 

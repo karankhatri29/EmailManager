@@ -43,22 +43,54 @@ def test_a_negated_deadline_is_not_a_deadline():
     assert cat != "Urgent / Action Required"
 
 
-def test_model_loads_from_the_package_when_its_metadata_is_missing(monkeypatch):
-    """Serverless bundles can drop the .dist-info folder spacy.load(name) looks for; the package itself still loads."""
+def test_the_model_ships_with_the_app_and_needs_no_installed_package(monkeypatch):
+    """Serverless hosts may not install (or may strip) the model package: the bundled copy is used first."""
+    import sys
+
     from app.services import nlp_engine
 
+    monkeypatch.setitem(sys.modules, "en_core_web_sm", None)  # importing the package would fail
+    real_load = nlp_engine.spacy.load
+    seen = []
+
+    def only_paths(target):
+        seen.append(target)
+        if isinstance(target, str):
+            raise OSError("E050: by name it cannot be found")
+        return real_load(target)
+
+    monkeypatch.setattr(nlp_engine.spacy, "load", only_paths)
+    doc = nlp_engine.load_model()("Please pay the electricity bill.")
+    assert seen == [nlp_engine.BUNDLED_MODEL] and doc[1].pos_ in ("INTJ", "VERB", "ADV", "AUX")
+    assert [t.lemma_ for t in doc][2:4] == ["the", "electricity"] or doc[0].text == "Please"
+
+
+def test_vercel_bundles_the_model_files():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    config = json.loads((root / "vercel.json").read_text(encoding="utf-8"))
+    assert "nlp_model" in config["functions"]["index.py"]["includeFiles"]
+    assert (root / "app" / "nlp_model" / "en_core_web_sm" / "meta.json").exists()
+
+
+def test_falls_back_to_an_installed_model_when_the_bundled_one_is_missing(monkeypatch, tmp_path):
+    from app.services import nlp_engine
+
+    monkeypatch.setattr(nlp_engine, "BUNDLED_MODEL", tmp_path / "nothing")
     calls = []
 
-    def no_metadata(name):
+    def by_name(name):
         calls.append(name)
-        raise OSError("E050: Can't find model")
+        raise OSError("E050")
 
-    monkeypatch.setattr(nlp_engine.spacy, "load", no_metadata)
-    assert nlp_engine.load_model()("Please pay the bill.")[0].text == "Please"
+    monkeypatch.setattr(nlp_engine.spacy, "load", by_name)
+    assert nlp_engine.load_model()("Please pay the bill.")[0].text == "Please"  # via the installed package
     assert calls == ["en_core_web_sm"]
 
 
-def test_a_missing_model_gives_a_clear_error_and_downloads_nothing(monkeypatch):
+def test_a_missing_model_gives_a_clear_error_and_downloads_nothing(monkeypatch, tmp_path):
     import importlib
 
     from app.services import nlp_engine
@@ -66,7 +98,8 @@ def test_a_missing_model_gives_a_clear_error_and_downloads_nothing(monkeypatch):
     def missing(name, *args, **kwargs):
         raise ImportError(name)
 
+    monkeypatch.setattr(nlp_engine, "BUNDLED_MODEL", tmp_path / "nothing")
     monkeypatch.setattr(nlp_engine.spacy, "load", lambda name: (_ for _ in ()).throw(OSError("E050")))
     monkeypatch.setattr(importlib, "import_module", missing)
-    with pytest.raises(RuntimeError, match="not installed"):
+    with pytest.raises(RuntimeError, match="was not found"):
         nlp_engine.load_model()

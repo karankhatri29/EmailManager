@@ -20,7 +20,6 @@ jobs:
       - name: Install
         run: |
           pip install -e ".[dev]"
-          python -m spacy download en_core_web_sm
       - name: Lint
         run: |
           ruff check app tests scripts alembic

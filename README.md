@@ -60,7 +60,6 @@ tests/{unit,integration}/
 
 ```
 pip install -e ".[dev]"
-python -m spacy download en_core_web_sm
 cp .env.example .env
 python -m scripts.generate_keys --write      # fills SECRET_KEY and ENCRYPTION_KEY in .env
 #   also set GEMINI_API_KEY in .env, and keep the Google OAuth client file as ./credentials.json

@@ -8,7 +8,7 @@ WORKDIR /app
 
 COPY pyproject.toml README.md ./
 COPY app ./app
-RUN pip install -e . && python -m spacy download en_core_web_sm
+RUN pip install -e .
 
 COPY alembic.ini ./
 COPY alembic ./alembic

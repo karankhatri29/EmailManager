@@ -34,7 +34,9 @@ def test_inline_manager_only_syncs_when_asked_and_does_it_before_returning(db, a
 
 
 def test_cron_endpoint_is_absent_without_a_secret_and_rejects_a_wrong_one(client):
-    assert client.get("/api/cron/run").status_code == 404
+    without = get_settings().model_copy(update={"cron_secret": ""})  # whatever the developer's .env sets
+    with patch("app.api.cron.get_settings", return_value=without):
+        assert client.get("/api/cron/run").status_code == 404
     configured = get_settings().model_copy(update={"cron_secret": "s3cret"})
     with patch("app.api.cron.get_settings", return_value=configured):
         assert client.get("/api/cron/run").status_code == 401

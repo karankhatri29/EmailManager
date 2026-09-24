@@ -3,7 +3,7 @@
   "functions": {
     "index.py": {
       "maxDuration": 60,
-      "includeFiles": "app/{static,templates}/**"
+      "includeFiles": "app/{static,templates,nlp_model}/**"
     }
   },
   "crons": [{ "path": "/api/cron/run", "schedule": "0 3 * * *" }]
