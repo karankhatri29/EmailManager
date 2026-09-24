@@ -30,11 +30,11 @@ def _store(db, account, mail, message_id, **extra):
 
 @pytest.fixture
 def scanner(session_factory):
-    """A fresh scanner wired to the test database (never the real one, and never the network)."""
-    s = booking_scan.BookingScanner(max_workers=2)
+    """A scanner that runs each scan inline: the test database is one shared connection, so scans on background
+    threads would interleave with the test's own statements. Never the real scanner, never the network."""
+    s = booking_scan.BookingScanner(max_workers=1, inline=True)
     with patch.object(booking_scan, "SessionLocal", session_factory):
         yield s
-        s.wait(10)
     s._pool.shutdown(wait=True)
 
 
@@ -56,6 +56,18 @@ def api(auth_client, scanner):
 def bob_api(bob_client, scanner):
     bob_client.app.dependency_overrides[get_scanner] = lambda: scanner
     return bob_client
+
+
+def _eventually(check, timeout=3.0):
+    """Polls `check()` (which reads through a fresh session) until it returns truthy: scans run on threads."""
+    import time
+
+    deadline = time.time() + timeout
+    while True:
+        value = check()
+        if value or time.time() > deadline:
+            return value
+        time.sleep(0.05)
 
 
 class FakeSearchProvider:
@@ -184,18 +196,44 @@ def test_listing_starts_a_scan_of_mailboxes_that_were_never_scanned(api, db, use
     fake = FakeSearchProvider([_raw(FLIGHT, "g1"), _raw(TRAIN, "g2")])
     with patch("app.services.booking_scan.get_provider", return_value=fake):
         first = api.get("/api/bookings").json()
-        assert first["items"] == []  # not blocked on the mailbox
-        scanner.wait(10)
-        later = api.get("/api/bookings").json()
-
-    assert sorted(b["kind"] for b in later["items"]) == ["flight", "train"]
-    assert later["scanning"] is False and later["last_scan"] is not None
+    assert sorted(b["kind"] for b in first["items"]) == [
+        "flight",
+        "train",
+    ]  # inline scan: done before the reply
+    assert first["scanning"] is False and first["last_scan"] is not None
     assert sorted(fake.full_reads) == ["g1", "g2"]
     stored = db.query(Email).filter(Email.account_id == account.id).all()
     assert len(stored) == 2 and all(
         e.summary == "" for e in stored
     )  # no AI summaries queued for old ticket mails
     assert {e.id for e in stored} == {f"{account.id}:g1", f"{account.id}:g2"}
+
+
+def test_the_reply_does_not_wait_for_a_slow_mailbox(auth_client, session_factory, db, user):
+    """A real background thread, held on a gate before it touches the database, so nothing runs concurrently."""
+    import threading
+
+    gate = threading.Event()
+    threaded = booking_scan.BookingScanner(max_workers=1)
+    auth_client.app.dependency_overrides[get_scanner] = lambda: threaded
+
+    class Gated(FakeSearchProvider):
+        def search_booking_ids(self, days, limit):
+            gate.wait(10)
+            return super().search_booking_ids(days, limit)
+
+    make_account(db, user)
+    with (
+        patch.object(booking_scan, "SessionLocal", session_factory),
+        patch("app.services.booking_scan.get_provider", return_value=Gated([_raw(FLIGHT, "g1")])),
+    ):
+        first = auth_client.get("/api/bookings").json()
+        assert first["items"] == [] and first["scanning"] is True  # answered while the scan is still waiting
+        gate.set()
+        threaded.wait(10)
+        later = auth_client.get("/api/bookings").json()
+    assert [b["kind"] for b in later["items"]] == ["flight"] and later["scanning"] is False
+    threaded._pool.shutdown(wait=True)
 
 
 def test_a_scanned_mailbox_is_not_scanned_again_soon(api, db, user, scanner):
@@ -257,7 +295,8 @@ def test_a_body_cut_off_by_the_regular_sync_is_completed(api, db, user, scanner)
         api.post("/api/bookings/scan")
         scanner.wait(10)
     assert fake.full_reads == ["g1"]
-    assert db.get(Email, f"{account.id}:g1").body == FLIGHT["body"]
+    body = _eventually(lambda: (db.expire_all() or db.get(Email, f"{account.id}:g1").body) == FLIGHT["body"])
+    assert body
     assert api.get("/api/bookings").json()["items"][0]["reference"] == "X7K2QP"
 
 
@@ -269,8 +308,9 @@ def test_a_revoked_login_flags_the_mailbox_and_reports_the_error(api, db, user, 
     with patch("app.services.booking_scan.get_provider", return_value=fake):
         api.post("/api/bookings/scan")
         scanner.wait(10)
-    db.expire_all()
-    assert db.get(type(account), account.id).status == "needs_reauth"
+    assert _eventually(
+        lambda: (db.expire_all() or db.get(type(account), account.id).status) == "needs_reauth"
+    )
     assert "rejected" in (api.get("/api/bookings/status").json()["error"] or "")
 
 
