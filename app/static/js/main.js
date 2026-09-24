@@ -88,6 +88,8 @@ async function refreshEverything({ silent = true } = {}) {
     await Promise.all([loadEmails({ silent }), loadAccounts(), loadActivities(), loadTrips().catch(() => {}), loadNotifications()]);
 }
 
+let justConnected = false;
+
 async function pollSync() {
     try {
         const s = await api('/api/sync/status');
@@ -114,7 +116,11 @@ async function pollSync() {
 async function syncNow() {
     if (!isDesktop()) setDrawer(false); // reveal the dashboard again after tapping Sync in the drawer
     try {
+        // On hosting without background threads this request IS the sync, so it can take a while: show progress.
+        document.querySelectorAll('[data-action="sync"]').forEach((item) => item.classList.add('is-syncing'));
+        setSyncStatus('<span class="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse mr-2"></span>Syncing…', 'text-blue-400');
         await api('/api/sync', { method: 'POST', params: { time_filter: state.timeframe } });
+        wasSyncing = true; // let the next poll refresh the lists once it sees the sync has finished
         await pollSync();
     } catch (err) {
         toast(err.message, 'error');
@@ -137,7 +143,10 @@ function handleConnectResult() {
         not_configured: 'Outlook is not set up on this server yet. An administrator needs to add the Microsoft app credentials.',
         failed: 'Could not finish connecting the mailbox. Please try again.',
     };
-    if (connected) toast(`Connected ${connected}. Syncing your mail…`, 'success');
+    if (connected) {
+        justConnected = true;
+        toast(`Connected ${connected}. Syncing your mail…`, 'success');
+    }
     else toast(messages[error] || 'Could not connect the mailbox.', 'error', 8000);
     window.history.replaceState({}, '', window.location.pathname);
 }
@@ -155,6 +164,10 @@ async function startApp(user) {
     await Promise.all([loadEmails(), loadActivities()]); // instant: served from the database
     loadNotifications();
     loadTrips().catch(() => {}); // starts the ticket scan if this mailbox has not been scanned lately
+    if (justConnected) {
+        justConnected = false;
+        syncNow(); // hosting without background threads syncs only when asked; elsewhere this is a harmless repeat
+    }
     await pollSync();
     clearInterval(pollTimer);
     pollTimer = setInterval(pollSync, POLL_MS);

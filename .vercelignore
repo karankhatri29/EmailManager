@@ -1,0 +1,26 @@
+# Never upload secrets, local databases, tests or tooling
+.env
+.env.*
+!.env.example
+credentials.json
+token.json
+*.db
+*.db-*
+*.bak*
+*.txt
+!requirements.txt
+.git
+.venv
+venv
+__pycache__
+*.pyc
+tests
+scripts
+alembic
+docker-compose.yml
+Dockerfile
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov

@@ -1,0 +1,24 @@
+# What Vercel installs for the serverless deployment (Celery, Redis and uvicorn are not needed there).
+# Keep in step with [project].dependencies in pyproject.toml.
+fastapi>=0.115
+jinja2>=3.1
+pydantic>=2.7
+pydantic-settings>=2.3
+sqlalchemy>=2.0
+psycopg[binary]>=3.2
+argon2-cffi>=23.1
+cryptography>=42
+itsdangerous>=2.2
+email-validator>=2.1
+icalendar>=6
+dateparser>=1.2
+requests>=2.31
+spacy>=3.7,<3.9
+numpy>=1.26
+tzdata>=2024.1
+google-genai
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
+# the small English model spaCy loads (a wheel, so no download at start-up)
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl

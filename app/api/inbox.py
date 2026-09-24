@@ -57,7 +57,7 @@ def start_sync(
     """Starts a background sync of all the user's mailboxes (mailboxes already syncing are skipped)."""
     accounts = accounts_repo.list_active_for_user(db, user.id)
     for account in accounts:
-        manager.trigger(account.id, time_filter)
+        manager.trigger(account.id, time_filter, wait=True)
     return manager.status(a.id for a in accounts)
 
 

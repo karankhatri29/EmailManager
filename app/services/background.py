@@ -1,5 +1,6 @@
 import logging
 import threading
+import time
 from collections.abc import Iterable
 from concurrent.futures import Future, ThreadPoolExecutor, wait
 from datetime import datetime, timezone
@@ -28,7 +29,12 @@ def _idle_state() -> dict:
 class SyncManager:
     """Syncs mailboxes on background threads: one sync per mailbox at a time, a few mailboxes in parallel."""
 
-    def __init__(self, max_workers: int | None = None) -> None:
+    def __init__(self, max_workers: int | None = None, inline: bool | None = None) -> None:
+        """`inline=True` (the default on serverless hosting) runs a sync in the calling request instead of on a
+        thread, because nothing may keep running after the response is sent. There, only an explicit
+        `trigger(..., wait=True)` syncs; the automatic "this mailbox looks stale" triggers do nothing and the
+        scheduled /api/cron/run keeps mailboxes fresh."""
+        self._inline = get_settings().is_serverless if inline is None else inline
         self._lock = threading.Lock()
         self._pool = ThreadPoolExecutor(
             max_workers=max_workers or get_settings().sync_max_workers, thread_name_prefix="mail-sync"
@@ -36,8 +42,12 @@ class SyncManager:
         self._states: dict[int, dict] = {}
         self._futures: list[Future] = []
 
-    def trigger(self, account_id: int, timeframe: str) -> bool:
-        """Starts a background sync of a mailbox. Returns False if that mailbox is already syncing."""
+    def trigger(self, account_id: int, timeframe: str, wait: bool = False) -> bool:
+        """Starts a background sync of a mailbox. Returns False if that mailbox is already syncing.
+
+        Inline mode: runs it now, in this call, when `wait` is true; otherwise does nothing (returns False)."""
+        if self._inline and not wait:
+            return False
         with self._lock:
             state = self._states.get(account_id)
             if state and state["syncing"]:
@@ -48,8 +58,11 @@ class SyncManager:
                 "timeframe": timeframe,
                 "started_at": datetime.now(timezone.utc),
             }
-            self._futures = [f for f in self._futures if not f.done()]
-            self._futures.append(self._pool.submit(self._run, account_id, timeframe))
+            if not self._inline:
+                self._futures = [f for f in self._futures if not f.done()]
+                self._futures.append(self._pool.submit(self._run, account_id, timeframe))
+        if self._inline:
+            self._run(account_id, timeframe)
         return True
 
     def _run(self, account_id: int, timeframe: str) -> None:
@@ -108,6 +121,24 @@ def sync_all_accounts(timeframe: str = DEFAULT_TIMEFRAME) -> int:
     with SessionLocal() as db:
         account_ids = accounts_repo.list_all_active_ids(db)
     return sum(sync_manager.trigger(account_id, timeframe) for account_id in account_ids)
+
+
+def run_scheduled(timeframe: str = DEFAULT_TIMEFRAME, budget_seconds: float | None = None) -> dict:
+    """What the scheduled call does on serverless hosting: sync every active mailbox one after another, then run the
+    recurring jobs. Stops starting new mailbox syncs once `budget_seconds` is used, so a slow round cannot outlive
+    the function's time limit (mailboxes are synced least-recently-synced first, so the next round catches up)."""
+    started = time.monotonic()
+    with SessionLocal() as db:
+        account_ids = accounts_repo.list_all_active_ids(db)
+        last = accounts_repo.last_synced_map(db, account_ids)
+    oldest_first = sorted(account_ids, key=lambda i: last[i].timestamp() if last.get(i) else 0)
+    synced = skipped = 0
+    for account_id in oldest_first:
+        if budget_seconds is not None and time.monotonic() - started > budget_seconds:
+            skipped += 1
+            continue
+        synced += sync_manager.trigger(account_id, timeframe, wait=True)
+    return {"synced": synced, "skipped": skipped, "jobs": jobs.run_periodic_jobs()}
 
 
 def start_periodic_sync(interval_seconds: float, timeframe: str = DEFAULT_TIMEFRAME) -> threading.Event:

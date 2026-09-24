@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ..core.config import get_settings
 from ..db.models import Email, User
 from ..db.session import get_db
 from ..repositories import accounts as accounts_repo
@@ -92,7 +93,8 @@ def list_bookings(
     accounts = accounts_repo.list_active_for_user(db, user.id)
     ids = [a.id for a in accounts]
     for account in accounts:
-        if refresh or booking_scan.is_stale(db, account.id):
+        # Serverless hosting scans inside this request, so only when asked (not on every page load)
+        if refresh or (booking_scan.is_stale(db, account.id) and not get_settings().is_serverless):
             scanner.trigger(account.id)
 
     if kind is not None and kind not in KINDS:

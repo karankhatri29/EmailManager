@@ -160,6 +160,10 @@ cp .env.example .env         # fill in the keys (see above) and Google client id
 docker compose up --build    # http://localhost:8000  (migrations run on start)
 ```
 
+## Deploy on Vercel (free)
+
+See [DEPLOY.md](DEPLOY.md): serverless settings, Neon Postgres, the daily cron, and the environment variables.
+
 ## Development
 
 ```

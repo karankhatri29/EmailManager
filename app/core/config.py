@@ -1,8 +1,10 @@
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -46,6 +48,17 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=BASE_DIR / ".env", extra="ignore")
 
     database_url: str = f"sqlite:///{(BASE_DIR / 'app.db').as_posix()}"
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_the_psycopg_driver(cls, url: str) -> str:
+        """Hosted Postgres (Neon, Supabase, Heroku...) hands out postgres:// or postgresql:// URLs; SQLAlchemy needs
+        the driver we ship (psycopg 3) spelled out."""
+        for plain in ("postgres://", "postgresql://"):
+            if url.startswith(plain):
+                return "postgresql+psycopg://" + url[len(plain) :]
+        return url
+
     redis_url: str = "redis://localhost:6379/0"
 
     # Security. Generate both with: python -m scripts.generate_keys
@@ -95,6 +108,13 @@ class Settings(BaseSettings):
     # Run the periodic sync inside the API process (local dev without Redis).
     # Set to false when a Celery worker + beat does it instead.
     inprocess_sync: bool = True
+    # Serverless hosting (Vercel): no background threads survive between requests, so syncs run inside the request
+    # that asks for them and a scheduled call to /api/cron/run does the rest. Detected from the VERCEL variable.
+    serverless: bool = False
+    cron_secret: str = (
+        ""  # Vercel Cron sends it as "Authorization: Bearer <secret>"; empty disables /api/cron/run
+    )
+    cron_budget_seconds: int = 45  # stop starting new mailbox syncs after this long, the next run continues
     log_level: str = "INFO"
 
     def google_client(self) -> tuple[str, str]:
@@ -110,6 +130,10 @@ class Settings(BaseSettings):
             "Google OAuth client not configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, "
             "or provide credentials.json."
         )
+
+    @property
+    def is_serverless(self) -> bool:
+        return self.serverless or bool(os.environ.get("VERCEL"))
 
     @property
     def allowed_email_set(self) -> set[str]:

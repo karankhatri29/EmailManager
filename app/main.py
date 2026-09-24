@@ -13,6 +13,7 @@ from .api import (
     auth,
     bookings,
     calendar,
+    cron,
     inbox,
     mail,
     routes,
@@ -35,7 +36,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     warn_if_plaintext(engine)
     stops = []
-    if settings.inprocess_sync:
+    if settings.inprocess_sync and not settings.is_serverless:  # threads do not outlive a serverless request
         stops = [
             start_periodic_sync(settings.sync_interval_seconds),
             start_periodic_jobs(settings.jobs_interval_seconds),
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
         timetable,
         calendar,
         bookings,
+        cron,
     ):
         app.include_router(module.router)
     return app

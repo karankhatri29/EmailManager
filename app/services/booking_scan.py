@@ -142,4 +142,6 @@ class BookingScanner:
         wait(futures, timeout=timeout)
 
 
-scanner = BookingScanner(max_workers=max(1, get_settings().sync_max_workers // 2))
+scanner = BookingScanner(
+    max_workers=max(1, get_settings().sync_max_workers // 2), inline=get_settings().is_serverless
+)
