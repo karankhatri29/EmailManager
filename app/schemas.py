@@ -1,4 +1,5 @@
 from datetime import date, datetime, time, timezone
+from datetime import date as Day  # `EmailOut.date` is a field, so its own name cannot be used as a type
 from typing import Any, Literal
 
 from pydantic import (
@@ -79,6 +80,9 @@ class EmailOut(BaseModel):
     thread_id: str | None = None
     unsubscribe_url: str | None = None
     unsubscribe_one_click: bool = False
+    due_date: Day | None = None
+    due_kind: str | None = None
+    due_text: str | None = None
 
     @field_validator("date", "snoozed_until")
     @classmethod
@@ -201,6 +205,9 @@ class TaskOut(BaseModel):
     deadline: str
     sort_tier: int
     base_score: float
+    due_date: date | None = None
+    deadline_kind: str | None = None  # deadline | event | asap
+    deadline_text: str | None = None  # the words in the email the date was read from
 
 
 class SyncStatus(BaseModel):

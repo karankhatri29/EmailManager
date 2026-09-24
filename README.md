@@ -48,7 +48,7 @@ app/
   db/                      engine/session, SQLAlchemy models
   repositories/            database access (users, accounts, emails, activities)
   providers/               MailProvider interface, Gmail provider, Google OAuth flow
-  services/                sync, background sync manager, NLP, deadlines -> dates, activities, ICS, AI summaries
+  services/                sync, background sync manager, NLP (classifier, temporal.py dates, actions.py tasks), activities, ICS, AI summaries
   worker/                  Celery app + periodic sync task
   templates/  static/js/   the UI (ES modules)
 alembic/                   migrations
@@ -123,3 +123,19 @@ CI (`.github/workflows/ci.yml`) runs lint, type-check and tests on Python 3.10 a
 the models and migrations drift apart.
 
 `.env`, `credentials.json`, `token.json` and `*.db` are gitignored.
+
+
+## How dates and tasks are found
+
+`app/services/temporal.py` finds the one date a message is about; `app/services/actions.py` names what it asks
+you to do. Neither knows any sender, template or subject. Every date-like phrase is only a *candidate*: the
+words around it are read (a deadline cue such as "by" or "due", an event word, an obligation such as "please",
+a past-tense verb, "sent on"/"posted on"), quoted replies and footers are cut away first, and a candidate is
+shown only when the evidence is strong enough. Version numbers, prices, clock times, ratios, bare years, past
+events and habitual weekdays ("every Monday") never show up as dates; ambiguous numeric dates (03/04) follow
+the region of the user's time zone. Results are stored on each email (`due_date`, `due_kind`, `due_text`) and
+the Command Center shows the exact words the date came from.
+
+`tests/nlp_corpus.py` holds labelled emails (real deadlines and events, look-alike traps, task titles) that
+drive `tests/unit/test_temporal.py` and `test_actions.py`. After changing the extraction run
+`python scripts/reanalyze.py` to refresh stored mail.

@@ -42,6 +42,9 @@ def test_first_request_returns_immediately_then_the_background_sync_fills_data(a
         "sender_address",
         "unsubscribe_url",
         "unsubscribe_one_click",
+        "due_date",
+        "due_kind",
+        "due_text",
     } == set(data[0])
 
 
@@ -203,7 +206,17 @@ def test_scheduler_orders_the_users_tasks(auth_client, db, account, bob_account)
     )
     tasks = auth_client.get("/api/scheduler").json()
     assert [t["id"].split(":")[1] for t in tasks] == ["asap", "plain"]  # Bob's mail is not included
-    assert set(tasks[0]) == {"id", "sender", "task", "deadline", "sort_tier", "base_score"}
+    assert set(tasks[0]) == {
+        "id",
+        "sender",
+        "task",
+        "deadline",
+        "sort_tier",
+        "base_score",
+        "due_date",
+        "deadline_kind",
+        "deadline_text",
+    }
 
 
 def test_scheduler_empty(auth_client):

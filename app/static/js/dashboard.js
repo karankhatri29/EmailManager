@@ -76,10 +76,8 @@ const TASK_GROUPS = [
     { label: 'No deadline', tone: 'neutral', test: (t) => t.sort_tier >= 4 },
 ];
 
-const deadlineText = (t) => ({
-    'No Explicit Deadline Stated': 'No date',
-    'Immediate / End of Day Target': 'ASAP',
-}[t.deadline] || t.deadline);
+// The server words the date ("Due Tomorrow", "Overdue by 2 days", "Fri 2 Oct", "ASAP", "No date").
+const deadlineText = (t) => t.deadline;
 
 async function renderTasks() {
     const list = $('taskList');

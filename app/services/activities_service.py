@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from ..core.config import ACTIONABLE_MAX_AGE_DAYS, SUMMARIZED_CATEGORIES
 from ..db.models import Activity
 from ..repositories import activities as activities_repo
-from .deadlines import NO_DEADLINE, resolve_deadline
-from .nlp_engine import extract_action_task, extract_explicit_deadline, nlp, process_text
+from .analysis import analyse
+from .temporal import ASAP, DEADLINE
 
 
 def _aware(value: datetime) -> datetime:
@@ -15,24 +15,29 @@ def _aware(value: datetime) -> datetime:
 
 
 def activity_from_email(email: dict) -> dict:
-    """Builds the calendar item for an Urgent/Important email: its action, and its deadline if it states one."""
-    text = f"{email['subject']} {email['body']}"
-    nlp_data = process_text(text)
-    title = extract_action_task(email["subject"], nlp(text), nlp_data["clean_text_raw"])
-    deadline = extract_explicit_deadline(nlp_data["clean_text_raw"], nlp_data["entities"])
-    due = resolve_deadline(deadline["value"], email["date"])
+    """Builds the calendar item for an Urgent/Important email: its action, and its date if it states one.
+
+    Uses the analysis stored on the email when there is one, and analyses the message otherwise.
+    """
+    if not email.get("nlp_version"):
+        email = {**email, **analyse(email["subject"], email["body"], email["date"])}
+    kind, day = email.get("due_kind"), email.get("due_date")
+    if kind == ASAP:
+        day = _aware(email["date"]).date()
+    start = datetime(day.year, day.month, day.day, tzinfo=timezone.utc) if day else None
 
     notes = f"From: {email['sender']}\nSubject: {email['subject']}"
-    if deadline["value"] != NO_DEADLINE:
-        notes += f"\nDeadline detected: {deadline['value']}"
+    if email.get("due_text"):
+        label = {DEADLINE: "Deadline", ASAP: "Requested"}.get(kind or "", "Event date")
+        notes += f'\n{label} found in the email: "{email["due_text"]}"'
 
     return {
         "user_id": email["user_id"],
         "email_id": email["id"],
-        "title": title[:255],
+        "title": (email.get("task") or email["subject"])[:255],
         "notes": notes,
-        "start_at": due,
-        "all_day": due is not None,
+        "start_at": start,
+        "all_day": start is not None,
         "status": "todo",
         "source": "email",
     }

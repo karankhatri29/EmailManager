@@ -11,7 +11,7 @@ URGENT = "Urgent / Action Required"
 def test_urgent_email_gets_task_but_no_summary_yet():
     out = email_processor.process_emails([make_email(subject="OTP", body="your verification code is 1")])
     assert out[0]["category"] == URGENT
-    assert out[0]["task"].startswith("OTP")
+    assert out[0]["task"] == "OTP"  # asks for nothing specific, so the subject names it
     assert out[0]["summary"] is None  # filled in later by sync_service.summarize_pending
 
 
@@ -38,6 +38,12 @@ def test_output_has_exactly_the_stored_fields():
         "category_source",
         "summary",
         "task",
+        "nlp_version",
+        "due_date",
+        "due_kind",
+        "due_text",
+        "due_time",
+        "due_confidence",
     }
 
 

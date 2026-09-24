@@ -13,6 +13,7 @@ from ..repositories import rules as rules_repo
 from . import embeddings, followups
 from .activities_service import create_activities_for_emails
 from .ai_summarizer import summarize_email
+from .analysis import order_for_user
 from .email_processor import process_emails
 from .notifier import notify_urgent
 from .rules import to_specs
@@ -46,7 +47,9 @@ def sync_account(db: Session, account: MailAccount, timeframe: str) -> int:
 
     for message in raw:
         message["id"] = emails_repo.make_email_id(account.id, message["id"])
-    processed = process_emails(raw, to_specs(rules_repo.list_for_user(db, account.user_id)))
+    processed = process_emails(
+        raw, to_specs(rules_repo.list_for_user(db, account.user_id)), order_for_user(db, account.user_id)
+    )
     for email in processed:
         email["user_id"] = account.user_id
         email["account_id"] = account.id

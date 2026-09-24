@@ -6,9 +6,12 @@ from ..db.models import User
 from ..db.session import get_db
 from ..repositories import accounts as accounts_repo
 from ..repositories import emails as emails_repo
+from ..repositories import settings as settings_repo
 from ..schemas import EmailOut, SyncStatus, TaskOut
+from ..services.analysis import reanalyze_outdated
 from ..services.background import SyncManager
-from ..services.graph_scheduler import build_scheduler_graph
+from ..services.briefing import local_now
+from ..services.scheduler import build_schedule
 from ..services.sync_service import is_stale
 from .deps import current_user, get_sync_manager
 
@@ -76,9 +79,10 @@ def get_graph_schedule(
 ):
     """The user's action items ordered by deadline tier (optionally for one mailbox)."""
     _check_account(db, user, account_id)
+    reanalyze_outdated(db, user.id)  # mail stored before the current analysis version
     rows = emails_repo.list_in_window(db, user.id, TIMEFRAMES[time_filter][1], account_id)
     open_rows = [
         row for row in rows if emails_repo.is_open(row)
     ]  # handled or snoozed mail is not an action item
-    emails = [EmailOut.model_validate(row).model_dump() for row in open_rows]
-    return build_scheduler_graph(emails)
+    today = local_now(settings_repo.get_or_create(db, user.id)).date()
+    return build_schedule(open_rows, today)

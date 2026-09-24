@@ -14,6 +14,7 @@ from ..repositories import activities as activities_repo
 from ..repositories import emails as emails_repo
 from ..repositories import rules as rules_repo
 from .activities_service import create_activities_for_emails
+from .analysis import analyse_email
 from .email_processor import classify_email
 from .nlp_engine import category_score
 from .rules import to_specs
@@ -29,6 +30,11 @@ def _as_dict(email: Email) -> dict:
         "sender": email.sender,
         "date": email.date,
         "category": email.category,
+        "task": email.task,
+        "nlp_version": email.nlp_version,
+        "due_date": email.due_date,
+        "due_kind": email.due_kind,
+        "due_text": email.due_text,
     }
 
 
@@ -46,10 +52,8 @@ def _set(email: Email, category: str, source: str, reason: str, score: float | N
     new_score = score if score is not None else category_score(category)
     changed = (email.category, email.category_source, email.reason) != (category, source, reason)
     email.category, email.category_source, email.reason, email.score = category, source, reason, new_score
-    if changed and category not in SUMMARIZED_CATEGORIES:
-        email.task = None
-    elif changed and email.task is None:
-        email.task = f"{email.subject[:50]}..."
+    if changed:
+        analyse_email(email)  # actionable mail gets its task and date; other mail is cleared
     return changed
 
 

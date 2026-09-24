@@ -1,4 +1,5 @@
 from datetime import date, datetime, time, timezone
+from datetime import date as Day  # `Email.date` is a column, so its own name cannot be used as a type
 
 from sqlalchemy import (
     Boolean,
@@ -78,6 +79,14 @@ class Email(Base):
     embedding: Mapped[bytes | None] = mapped_column(
         LargeBinary, nullable=True
     )  # float32 vector for semantic search
+
+    # What the text analysis found (see services/analysis.py); nlp_version 0 = not analysed yet
+    due_date: Mapped[Day | None] = mapped_column(Date, nullable=True, index=True)
+    due_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)  # deadline | event | asap
+    due_text: Mapped[str | None] = mapped_column(String(80), nullable=True)  # the words it was read from
+    due_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    due_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    nlp_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class SyncState(Base):

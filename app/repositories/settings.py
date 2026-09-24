@@ -1,7 +1,12 @@
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..db.models import UserSettings
+
+
+def find(db: Session, user_id: int) -> UserSettings | None:
+    return db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
 
 
 def get_or_create(db: Session, user_id: int) -> UserSettings:
@@ -18,7 +23,13 @@ def get_or_create(db: Session, user_id: int) -> UserSettings:
             followup_days=3,
         )
         db.add(row)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:  # another request or sync created it first
+            db.rollback()
+            row = db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
+            if row is None:
+                raise
     return row
 
 

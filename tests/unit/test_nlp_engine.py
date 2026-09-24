@@ -2,8 +2,6 @@ import pytest
 
 from app.services.nlp_engine import (
     calculate_priority,
-    extract_explicit_deadline,
-    extract_project_context,
     process_text,
 )
 
@@ -40,34 +38,6 @@ def test_informational_guard_blocks_urgent():
     assert cat == "Important"
 
 
-@pytest.mark.parametrize(
-    "subject,expected",
-    [
-        ("[VIT_2027] Fees", "VIT_2027"),
-        ("Weekly | Project Alpha update", "Project Alpha update"),
-        ("Something plain", "General Operations"),
-    ],
-)
-def test_extract_project_context(subject, expected):
-    assert extract_project_context(subject, "nothing here") == expected
-
-
-@pytest.mark.parametrize(
-    "text,value,tier",
-    [
-        ("submit by 15/06/2026", "Date: 15/06/2026", 1),
-        ("need this asap", "Immediate / End of Day Target", 3),
-        ("send it by friday", "Upcoming Friday", 3),
-        ("no dates at all", "No Explicit Deadline Stated", 4),
-    ],
-)
-def test_extract_explicit_deadline(text, value, tier):
-    assert extract_explicit_deadline(text, {}) == {"value": value, "tier": tier}
-
-
-def test_textual_date_is_tier_1():
-    assert extract_explicit_deadline("due 2nd july please", {})["tier"] == 1
-
-
-def test_deadline_ner_ignores_generic_durations():
-    assert extract_explicit_deadline("hello", {"DATE": ["5 minutes"]})["tier"] == 4
+def test_a_negated_deadline_is_not_a_deadline():
+    _, cat = calculate_priority("Policy", "There is no deadline for this. Please read when you have time.")
+    assert cat != "Urgent / Action Required"

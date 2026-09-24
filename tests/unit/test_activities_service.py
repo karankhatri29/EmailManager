@@ -28,14 +28,14 @@ def test_activity_from_email_with_a_deadline(account):
     assert activity["start_at"] == datetime(DUE.year, DUE.month, DUE.day, tzinfo=timezone.utc)
     assert activity["all_day"] is True and activity["source"] == "email" and activity["status"] == "todo"
     assert activity["title"] and len(activity["title"]) <= 255
-    assert "From: Prof <prof@uni.edu>" in activity["notes"] and "Deadline detected" in activity["notes"]
+    assert "From: Prof <prof@uni.edu>" in activity["notes"] and "Deadline found" in activity["notes"]
 
 
 def test_activity_without_a_deadline_is_unscheduled(account):
     email = _email(account, body="Kindly review the notes.")
     activity = activities_service.activity_from_email(email)
     assert activity["start_at"] is None and activity["all_day"] is False
-    assert "Deadline detected" not in activity["notes"]
+    assert "found in the email" not in activity["notes"]
 
 
 def test_creates_activities_only_for_urgent_and_important_emails(db, account):

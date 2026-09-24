@@ -14,140 +14,6 @@ except OSError:
 
 
 # =============================================================
-# PROJECT / COURSE CONTEXT EXTRACTOR
-# =============================================================
-def extract_project_context(subject, text_raw):
-    """
-    NLP Rule-Based Extractor to isolate specific courses, university codes,
-    or corporate program identifiers from headers and email boundaries.
-    """
-    if not subject:
-        subject = ""
-
-    # Pattern A: Capture brackets (e.g., "[VIT_VELLORE_2027]" or "[Project-X]")
-    bracket_match = re.search(r"\[([^\]]+)\]", subject)
-    if bracket_match:
-        return bracket_match.group(1).strip()
-
-    # Pattern B: Split pipes or dashes often found in transactional mailer logs
-    for divider in ["|", " - "]:
-        if divider in subject:
-            parts = subject.split(divider)
-            for part in parts:
-                if any(
-                    k in part.lower()
-                    for k in ["intern", "course", "assessment", "project", "class", "lab", "assignment"]
-                ):
-                    return part.strip()
-            return parts[0].strip()
-
-    # Pattern C: Grammatical fallbacks using keywords near target concepts
-    course_keywords = ["course", "program", "assessment", "project", "assignment"]
-    words = text_raw.split()
-    for keyword in course_keywords:
-        if keyword in words:
-            idx = words.index(keyword)
-            if idx > 0:
-                prefix = words[idx - 1].upper()
-                if len(prefix) > 2 and prefix.isalnum():
-                    return f"{prefix} {keyword.capitalize()}"
-
-    return "General Operations"
-
-
-# =============================================================
-# ADVANCED TASK GRAMMATICAL OBJECT MINER
-# =============================================================
-def extract_action_task(subject, doc, text_raw):
-    """
-    Grammatical dependency object miner: extracts the literal action command
-    (Verb + Direct Object Context) from text rather than using subject headings.
-    """
-    # Pass 1: Scan for clear directive request action words in the email body
-    for token in doc:
-        if token.pos_ == "VERB" and token.lemma_ in [
-            "submit",
-            "complete",
-            "review",
-            "verify",
-            "reply",
-            "pay",
-            "upload",
-            "fill",
-            "attend",
-            "action",
-        ]:
-            # Track dependency subtree paths to assemble noun attributes cleanly
-            subtree = [w.text for w in token.rights if w.dep_ in ["dobj", "prep", "pobj", "attr"]]
-            if subtree:
-                extracted = f"{token.text.capitalize()} {' '.join(subtree).strip()}"
-                cleaned = re.sub(r"\s+", " ", extracted).strip()
-                # Enforce safe length bounds to prevent messy run-on layout lines
-                if 10 < len(cleaned) < 75:
-                    return cleaned
-
-    # Pass 2: Fallback to filtering the subject header line if body parsing yields no clean verbs
-    clean_sub = re.sub(r"(?i)(fwd:|re:|\[.*?\])", "", subject).strip()
-    return clean_sub if clean_sub else "Review Context Details"
-
-
-# =============================================================
-# ROBUST CALENDAR DATE & TIMELINE TRACKER
-# =============================================================
-def extract_explicit_deadline(text_raw, entities):
-    """
-    Advanced Date and Timeline Analyzer. Combines Regex matching rules
-    and Named Entity Recognition (NER) to isolate standard calendar matrices.
-    """
-    # 1. Advanced Structural Regex Pass (Catches common Indian/Global format layouts missed by spaCy)
-    # Pattern A: Numeric sequences like 15/06/2026, 22-07-2026, 05.08
-    numeric_date_match = re.search(r"\b\d{1,2}[/\-\.]\d{1,2}([/\-\.]\d{2,4})?\b", text_raw)
-    if numeric_date_match:
-        return {"value": f"Date: {numeric_date_match.group(0)}", "tier": 1}
-
-    # Pattern B: Textual months like June 15, 14th of August, 2nd July
-    month_regex = r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*"
-    textual_date_match = re.search(
-        rf"\b(\d{{1,2}}(st|nd|rd|th)?\s+(of\s+)?{month_regex}|{month_regex}\s+\d{{1,2}}(st|nd|rd|th)?)\b",
-        text_raw,
-        re.IGNORECASE,
-    )
-    if textual_date_match:
-        return {"value": textual_date_match.group(0).title(), "tier": 1}
-
-    # 2. Named Entity Recognition (NER) Pass
-    if entities.get("DATE"):
-        # Safeguard fallback filter: prevent generic timestamps like '5 minutes' from counting as dates
-        generic_time_indicators = ["minute", "hour", "seconds", "weeks ago", "years ago", "yesterday"]
-        discovered_date = entities["DATE"][0]
-        if not any(g in discovered_date.lower() for g in generic_time_indicators):
-            return {"value": discovered_date.title(), "tier": 1}
-
-    # 3. Tier 3 Relative Day Sweeps ("today", "tomorrow", specific weekdays)
-    immediate_triggers = [
-        "today",
-        "tomorrow",
-        "tonight",
-        "eod",
-        "end of day",
-        "by tonight",
-        "asap",
-        "as soon as possible",
-        "urgently",
-    ]
-    if any(trigger in text_raw for trigger in immediate_triggers):
-        return {"value": "Immediate / End of Day Target", "tier": 3}
-
-    weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-    for day in weekdays:
-        if f"by {day}" in text_raw or f"on {day}" in text_raw:
-            return {"value": f"Upcoming {day.capitalize()}", "tier": 3}
-
-    # 4. Tier 4: No stated timeframe boundary exists, but task obligation is verified
-    return {"value": "No Explicit Deadline Stated", "tier": 4}
-
-
-# =============================================================
 # CORE NLP PROCESSING PIPELINE
 # =============================================================
 def process_text(raw_text):
@@ -269,6 +135,7 @@ INFORMATIONAL_GUARDS = [
     "summary of achievements",
     "successfully updated",
 ]
+_NO_DEADLINE = re.compile(r"\b(?:no|without|not? any|nor) (?:\w+ ){0,2}(?:deadline|due date)\b")
 DEADLINE_MARKERS = ["deadline", "due date", "by end of day", "final call to submit"]
 TASK_LEMMAS = ["submit", "complete", "review", "verify", "reply", "attend", "fill", "upload", "pay"]
 URGENCY_WORDS = ["please", "kindly", "must", "required", "urgently"]
@@ -326,7 +193,7 @@ def classify(subject, body):
 
     # Rule 4: imperative obligations (with informational guards)
     informational = _matches(text_raw, INFORMATIONAL_GUARDS)
-    deadline_markers = _matches(text_raw, DEADLINE_MARKERS)
+    deadline_markers = [] if _NO_DEADLINE.search(text_raw) else _matches(text_raw, DEADLINE_MARKERS)
 
     evidence = []
     if not informational:
