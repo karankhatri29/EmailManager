@@ -40,5 +40,13 @@ def update(db: Session, row: UserSettings, **fields) -> UserSettings:
     return row
 
 
+def list_with_auto_cleanup(db: Session) -> list[UserSettings]:
+    return list(db.scalars(select(UserSettings).where(UserSettings.auto_cleanup.is_(True))))
+
+
+def list_with_digest_enabled(db: Session) -> list[UserSettings]:
+    return list(db.scalars(select(UserSettings).where(UserSettings.digest_enabled.is_(True))))
+
+
 def list_with_briefing_enabled(db: Session) -> list[UserSettings]:
     return list(db.scalars(select(UserSettings).where(UserSettings.briefing_enabled.is_(True))))

@@ -112,6 +112,7 @@ def _parse_message(msg_detail, message_id):
         "thread_id": msg_detail.get("threadId"),
         "unsubscribe_url": unsubscribe_url,
         "unsubscribe_one_click": one_click,
+        "is_unread": "UNREAD" in msg_detail.get("labelIds", []),
     }
 
 

@@ -171,7 +171,14 @@ def test_run_periodic_jobs_runs_each_job_and_reports(session_factory, db, user, 
     _activity(db, user, -5)
     _followup(db, user, account, "t", -1)
     with patch.object(jobs, "SessionLocal", session_factory), patch(SEND, return_value=True):
-        assert jobs.run_periodic_jobs() == {"briefings": 1, "reminders": 1, "followups": 1, "pruned": 0}
+        assert jobs.run_periodic_jobs() == {
+            "briefings": 1,
+            "digests": 0,
+            "cleanups": 0,
+            "reminders": 1,
+            "followups": 1,
+            "pruned": 0,
+        }
 
 
 def test_one_failing_job_does_not_stop_the_others(session_factory, db, user, account):

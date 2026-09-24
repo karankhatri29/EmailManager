@@ -87,6 +87,7 @@ class Email(Base):
     due_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     due_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     nlp_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    is_unread: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # as of the sync; None = unknown
 
 
 class SyncState(Base):
@@ -151,6 +152,18 @@ class UserSettings(Base):
     urgent_alerts: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")  # in-app alerts
     reminder_emails: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     followup_days: Mapped[int] = mapped_column(Integer, default=3, server_default="3")  # nudge after N days
+    digest_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0"
+    )  # evening promo digest
+    digest_hour: Mapped[int] = mapped_column(Integer, default=19, server_default="19")  # local hour to send
+    digest_last_sent: Mapped[date | None] = mapped_column(Date, nullable=True)
+    auto_cleanup: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0"
+    )  # unsubscribe automatically
+    cleanup_months: Mapped[int] = mapped_column(
+        Integer, default=3, server_default="3"
+    )  # "unopened for N months"
+    cleanup_last_run: Mapped[date | None] = mapped_column(Date, nullable=True)
 
 
 class FollowUp(Base):

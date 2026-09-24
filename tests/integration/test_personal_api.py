@@ -28,6 +28,10 @@ def test_settings_have_safe_defaults(auth_client):
         "urgent_alerts": True,
         "reminder_emails": False,
         "followup_days": 3,
+        "digest_enabled": False,
+        "digest_hour": 19,
+        "auto_cleanup": False,
+        "cleanup_months": 3,
         "email_configured": body["email_configured"],
     }
 

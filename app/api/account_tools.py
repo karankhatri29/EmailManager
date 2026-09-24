@@ -17,6 +17,7 @@ from ..schemas import (
     ActivityOut,
     BriefingOut,
     BriefingSent,
+    DigestOut,
     FollowUpOut,
     MarkReadRequest,
     NotificationList,
@@ -26,6 +27,7 @@ from ..schemas import (
     SnoozeRequest,
 )
 from ..services import briefing as briefing_service
+from ..services import digest as digest_service
 from ..services.followups import waiting_days
 from ..services.jobs import briefing_subject
 from ..services.notifier import EmailNotConfigured, EmailSendError, send_email
@@ -47,6 +49,10 @@ def _settings_out(row) -> SettingsOut:
         urgent_alerts=row.urgent_alerts,
         reminder_emails=row.reminder_emails,
         followup_days=row.followup_days,
+        digest_enabled=row.digest_enabled,
+        digest_hour=row.digest_hour,
+        auto_cleanup=row.auto_cleanup,
+        cleanup_months=row.cleanup_months,
         email_configured=get_settings().smtp_configured,
     )
 
@@ -68,6 +74,8 @@ def update_settings(
     row = settings_repo.get_or_create(db, user.id)
     if "timezone" in changes or "briefing_hour" in changes:
         changes["briefing_last_sent"] = None  # a changed schedule may still send today's briefing
+    if "timezone" in changes or "digest_hour" in changes:
+        changes["digest_last_sent"] = None
     return _settings_out(settings_repo.update(db, row, **changes))
 
 
@@ -95,6 +103,31 @@ def email_briefing_now(user: User = Depends(current_user), db: Session = Depends
         raise HTTPException(status_code=503, detail="This server is not set up to send email.") from None
     except EmailSendError:
         logger.exception("Briefing email failed")
+        raise HTTPException(status_code=502, detail="The email could not be sent.") from None
+    return BriefingSent(sent_to=user.email)
+
+
+@router.get("/digest/promotions", response_model=DigestOut)
+def read_promotions_digest(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Today's promotions digest: how many promotional emails arrived and which deals were best."""
+    return digest_service.build_digest(db, user, settings_repo.get_or_create(db, user.id))
+
+
+@router.post("/digest/promotions/send", response_model=BriefingSent)
+def email_digest_now(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Emails today's promotions digest to your login address right now (handy to test the setup)."""
+    digest = digest_service.build_digest(db, user, settings_repo.get_or_create(db, user.id))
+    try:
+        send_email(
+            user.email,
+            "Your promotions digest",
+            digest_service.render_text(digest),
+            digest_service.render_html(digest),
+        )
+    except EmailNotConfigured:
+        raise HTTPException(status_code=503, detail="This server is not set up to send email.") from None
+    except EmailSendError:
+        logger.exception("Digest email failed")
         raise HTTPException(status_code=502, detail="The email could not be sent.") from None
     return BriefingSent(sent_to=user.email)
 

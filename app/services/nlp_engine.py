@@ -213,6 +213,16 @@ def classify(subject, body):
             _scaled(4.0, 4.1, len(evidence)), URGENT, "Needs action: " + "; ".join(evidence) + "."
         )
 
+    # Rule 4b: a plain request to the reader ("please log in to confirm your participation")
+    if not informational:
+        from .actions import find_request  # imported here: actions itself builds on this module's parser
+
+        request = find_request(body)
+        if request is not None and request[0] == 0:
+            return Classification(
+                _scaled(3.3, 3.5, 1), IMPORTANT, f"Asks you to do something: {request[1].lower()}."
+            )
+
     # Rule 5: announcements, updates, information broadcasts
     notices = _matches(text_raw, NOTICE_MARKERS)
     tagged = subject.strip().startswith("[")

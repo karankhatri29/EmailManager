@@ -216,6 +216,60 @@ def newsletter_groups(db: Session, user_id: int, days: int = 30, min_count: int 
     return sorted((g for g in groups.values() if g["count"] >= min_count), key=lambda g: -g["count"])
 
 
+def unopened_bulk_groups(
+    db: Session, user_id: int, months: int, min_count: int = 3, now: datetime | None = None
+) -> list[dict]:
+    """Bulk senders whose mail you have not opened for `months` months.
+
+    A sender qualifies when, over that period, it sent at least `min_count` messages, every one still unread
+    (as of the last sync), spread over most of the period. Mail with unknown read state never counts as unread.
+    """
+    now = now or datetime.now(timezone.utc)
+    days = months * 30
+    query = select(Email).where(
+        Email.user_id == user_id,
+        Email.date >= now - timedelta(days=days),
+        Email.sender_address != "",
+        or_(Email.category == "Promotional", Email.unsubscribe_url.is_not(None)),
+    )
+    groups: dict[str, dict] = {}
+    for email in db.scalars(query.order_by(Email.date.desc())):
+        group = groups.setdefault(
+            email.sender_address,
+            {
+                "sender_address": email.sender_address,
+                "sender": email.sender,
+                "account_id": email.account_id,
+                "count": 0,
+                "all_unread": True,
+                "first": email.date,
+                "last": email.date,
+                "unsubscribe_url": None,
+                "one_click": False,
+                "email_ids": [],
+            },
+        )
+        group["count"] += 1
+        group["all_unread"] = group["all_unread"] and email.is_unread is True
+        group["first"] = min(group["first"], email.date, key=_naive)
+        group["last"] = max(group["last"], email.date, key=_naive)
+        group["email_ids"].append(email.id)
+        if group["unsubscribe_url"] is None and email.unsubscribe_url:
+            group["unsubscribe_url"] = email.unsubscribe_url
+            group["one_click"] = email.unsubscribe_one_click
+    span = timedelta(days=days * 0.6)
+    found = [
+        g
+        for g in groups.values()
+        if g["all_unread"] and g["count"] >= min_count and _naive(g["last"]) - _naive(g["first"]) >= span
+    ]
+    return sorted(found, key=lambda g: -g["count"])
+
+
+def _naive(value: datetime) -> datetime:
+    return value.replace(tzinfo=None) if value.tzinfo else value
+
+
 # --- embeddings (semantic search) ----------------------------------------------------------------
 
 EMBED_MAX_AGE_DAYS = 400
@@ -263,3 +317,14 @@ def search_candidates(
             or_(Email.sender_address.like(like, escape=chr(92)), Email.sender.ilike(like, escape=chr(92)))
         )
     return list(db.scalars(select(Email).where(*conditions).order_by(Email.date.desc()).limit(limit)))
+
+
+def mark_done_for_sender(db: Session, user_id: int, sender_address: str) -> int:
+    """Archives (in this app) every open message from a sender."""
+    result = db.execute(
+        update(Email)
+        .where(Email.user_id == user_id, Email.sender_address == sender_address, Email.is_done.is_(False))
+        .values(is_done=True)
+    )
+    db.commit()
+    return int(getattr(result, "rowcount", 0) or 0)

@@ -39,6 +39,7 @@ def test_output_has_exactly_the_stored_fields():
         "summary",
         "task",
         "nlp_version",
+        "is_unread",
         "due_date",
         "due_kind",
         "due_text",

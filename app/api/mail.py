@@ -14,7 +14,10 @@ from ..db.session import get_db
 from ..repositories import accounts as accounts_repo
 from ..repositories import emails as emails_repo
 from ..repositories import rules as rules_repo
+from ..repositories import settings as settings_repo
 from ..schemas import (
+    CleanupRequest,
+    CleanupResult,
     EmailListItem,
     EmailOut,
     EmailUpdate,
@@ -25,10 +28,11 @@ from ..schemas import (
     SearchResponse,
     ThreadMessage,
     ThreadOut,
+    UnopenedNewsletterOut,
     UnsubscribeRequest,
     UnsubscribeResult,
 )
-from ..services import email_actions, search_service, threads
+from ..services import email_actions, newsletter_cleanup, search_service, threads
 from ..services.nlp_engine import PROMOTIONAL
 from ..services.rules import match, to_specs
 from ..services.textify import normalize_body
@@ -228,6 +232,41 @@ def _try_one_click(url: str) -> UnsubscribeResult:
     return UnsubscribeResult(
         method="link", url=url, ok=True, detail=f"{detail} Open the link to finish unsubscribing."
     )
+
+
+@router.get("/newsletters/unopened", response_model=list[UnopenedNewsletterOut])
+def list_unopened_newsletters(
+    months: int | None = Query(default=None, ge=1, le=12),
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Newsletters and promotions you have not opened for months (default: your cleanup setting)."""
+    months = months or settings_repo.get_or_create(db, user.id).cleanup_months
+    return [
+        UnopenedNewsletterOut(
+            sender_address=g["sender_address"],
+            sender=g["sender"],
+            messages=g["count"],
+            first_date=g["first"],
+            last_date=g["last"],
+            can_unsubscribe=bool(g["unsubscribe_url"]),
+            one_click=g["one_click"],
+        )
+        for g in newsletter_cleanup.suggestions(db, user.id, months)
+    ]
+
+
+@router.post("/newsletters/unopened/cleanup", response_model=list[CleanupResult])
+def clean_up_unopened_newsletters(
+    payload: CleanupRequest, user: User = Depends(current_user), db: Session = Depends(get_db)
+):
+    """Unsubscribes (one-click senders), mutes and archives the chosen unopened newsletters, or all of them."""
+    months = settings_repo.get_or_create(db, user.id).cleanup_months
+    groups = newsletter_cleanup.suggestions(db, user.id, months)
+    if payload.sender_addresses is not None:
+        wanted = {a.strip().lower() for a in payload.sender_addresses}
+        groups = [g for g in groups if g["sender_address"] in wanted]
+    return newsletter_cleanup.clean_up(db, user.id, groups)
 
 
 # --- smart search --------------------------------------------------------------------------------

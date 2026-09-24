@@ -51,6 +51,7 @@ def process_emails(raw_emails, rules=(), date_order="DMY"):
                 "reason": reason,
                 "category_source": source,
                 "summary": None,
+                "is_unread": email.get("is_unread"),
                 **analysis,
             }
         )

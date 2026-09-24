@@ -9,3 +9,9 @@ def sender_address(sender: str) -> str:
 
 def sender_domain(address: str) -> str:
     return address.rsplit("@", 1)[-1] if "@" in address else ""
+
+
+def sender_name(sender: str) -> str:
+    """The display name of "Name <a@b.com>", else the bare address."""
+    name, address = parseaddr(sender)
+    return (name or address or sender).strip().strip('"')

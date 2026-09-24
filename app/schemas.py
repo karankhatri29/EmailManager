@@ -190,6 +190,38 @@ class UnsubscribeRequest(BaseModel):
     mute: bool = True  # also stop showing this sender's mail as anything but Promotional
 
 
+class UnopenedNewsletterOut(BaseModel):
+    """A bulk sender whose mail has gone unopened for months."""
+
+    sender_address: str
+    sender: str
+    messages: int
+    first_date: datetime
+    last_date: datetime
+    can_unsubscribe: bool
+    one_click: bool  # true: cleaning up can unsubscribe automatically
+
+    @field_validator("first_date", "last_date")
+    @classmethod
+    def _utc(cls, value):
+        return _as_utc(value)
+
+
+class CleanupRequest(BaseModel):
+    sender_addresses: list[str] | None = None  # None: every suggestion
+
+
+class CleanupResult(BaseModel):
+    sender_address: str
+    sender: str
+    messages: int
+    method: Literal["one_click", "link", "none"]
+    unsubscribed: bool
+    archived: int
+    link: str | None = None  # open it to finish unsubscribing when it could not be done automatically
+    detail: str = ""
+
+
 class UnsubscribeResult(BaseModel):
     method: Literal["one_click", "link", "none"]
     url: str | None = None  # for "link": open it to finish unsubscribing
@@ -349,6 +381,10 @@ class SettingsOut(BaseModel):
     urgent_alerts: bool
     reminder_emails: bool
     followup_days: int
+    digest_enabled: bool
+    digest_hour: int
+    auto_cleanup: bool
+    cleanup_months: int
     email_configured: bool  # whether this server can send email at all
 
 
@@ -359,6 +395,10 @@ class SettingsUpdate(BaseModel):
     urgent_alerts: bool | None = None
     reminder_emails: bool | None = None
     followup_days: int | None = Field(default=None, ge=1, le=30)
+    digest_enabled: bool | None = None
+    digest_hour: int | None = Field(default=None, ge=0, le=23)
+    auto_cleanup: bool | None = None
+    cleanup_months: int | None = Field(default=None, ge=1, le=12)
 
 
 class BriefingOut(BaseModel):
@@ -374,6 +414,16 @@ class BriefingOut(BaseModel):
     waiting: list[dict[str, Any]]
     classes: list[dict[str, Any]] = []
     counts: dict[str, int]
+
+
+class DigestOut(BaseModel):
+    """The evening promotions digest."""
+
+    date: str
+    count: int
+    headline: str
+    deals: list[dict[str, Any]]
+    top_senders: list[dict[str, Any]]
 
 
 class BriefingSent(BaseModel):

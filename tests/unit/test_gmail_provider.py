@@ -65,6 +65,7 @@ def test_fetch_plain_text_multipart_with_real_date():
         "thread_id": "thread-9",
         "unsubscribe_url": "https://x.com/u?id=1",
         "unsubscribe_one_click": True,
+        "is_unread": False,
     }
 
 

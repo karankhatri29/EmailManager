@@ -52,3 +52,23 @@ def one_click_unsubscribe(url: str) -> bool:
     )
     response.close()
     return 200 <= response.status_code < 300
+
+
+def unsubscribe_now(url: str | None, one_click: bool) -> tuple[str, bool, str]:
+    """(method, done, detail). Only a one-click link is used automatically; any other link is handed back.
+
+    method is 'one_click' (done), 'link' (the user must open it), or 'none' (nothing usable).
+    """
+    if not url:
+        return "none", False, "This sender did not include an unsubscribe link."
+    if not one_click:
+        return "link", False, "Open the link to finish unsubscribing."
+    try:
+        if one_click_unsubscribe(url):
+            return "one_click", True, "Unsubscribed."
+        detail = "The sender did not accept the automatic request."
+    except UnsafeUrl as exc:
+        return "none", False, f"That link was not safe to open automatically ({exc})."
+    except requests.RequestException:
+        detail = "The sender could not be reached."
+    return "link", False, f"{detail} Open the link to finish unsubscribing."

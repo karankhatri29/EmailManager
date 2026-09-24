@@ -183,8 +183,9 @@ def _candidates(sentence):
             yield token
 
 
-def extract_action_title(subject: str, body: str) -> str:
-    """The action a message asks for as a short title; the subject when it asks for nothing in particular."""
+def find_request(body: str) -> tuple[int, str] | None:
+    """(rank, phrase) of the best request in the text: rank 0 is asked politely or firmly ("please confirm ..."),
+    rank 1 is a bare imperative from a small set of direct verbs ("Pay the bill.")."""
     text = strip_history_and_footer(body or "")[:MAX_TEXT_CHARS]
     doc = nlp(_LINE_LABEL.sub("", text))
     best = None
@@ -199,6 +200,12 @@ def extract_action_title(subject: str, body: str) -> str:
                 best = (rank, phrase)
         if best and best[0] == 0:
             break
+    return best
+
+
+def extract_action_title(subject: str, body: str) -> str:
+    """The action a message asks for as a short title; the subject when it asks for nothing in particular."""
+    best = find_request(body)
     if best is None:
         return _clean_subject(subject)
     title = best[1][0].upper() + best[1][1:]

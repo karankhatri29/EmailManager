@@ -125,7 +125,7 @@ class MicrosoftProvider:
         message = self._get(
             f"/me/messages/{graph_id}",
             params={
-                "$select": "subject,from,body,bodyPreview,receivedDateTime,conversationId,internetMessageHeaders"
+                "$select": "subject,from,body,bodyPreview,receivedDateTime,conversationId,internetMessageHeaders,isRead"
             },
             headers={"Prefer": 'outlook.body-content-type="text"'},
         )
@@ -137,6 +137,8 @@ class MicrosoftProvider:
             "body": normalize_body(body, MAX_BODY_CHARS),
             "date": _parse_date(message.get("receivedDateTime")),
         }
+        if "isRead" in message:
+            result["is_unread"] = not message["isRead"]
         if message.get("conversationId"):
             result["thread_id"] = message["conversationId"]
 

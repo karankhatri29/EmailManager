@@ -1,6 +1,7 @@
 import html
 import json
 import logging
+import re
 
 from google import genai
 from google.genai import types
@@ -28,22 +29,18 @@ Omit any section lacking explicit data. Do NOT write any introduction or greetin
 Email Text:
 {text}"""
 
-THREAD_PROMPT = """Summarise this email conversation for someone who has not read it. Be brief and concrete.
-Use exactly this Markdown layout, omit any section with nothing to say, and write no introduction. Do not use emoji.
-
-### Conversation
-[1-2 sentences: what the thread is about]
-
-### Decisions
-- [each decision or agreement reached]
-
-### Open Questions
-- [each unanswered question or unresolved point]
-
-### Next Steps
-- [who needs to do what, with dates if any]
+THREAD_PROMPT = """Summarise this email conversation for someone who was copied on it and has not read it.
+Write exactly three bullet points, each one sentence, covering the core decisions reached and the main
+arguments or open disagreements behind them, most important first. Name who decided or argued what when it
+matters. Use plain "- " bullets, no headings and no introduction. Do not use emoji.
 
 Messages, oldest first:
+{text}"""
+
+THREAD_PART_PROMPT = """These are the first messages of a long email conversation. Write short notes (at most 120
+words) on the decisions made, the main arguments, who took which side, and anything left open. Keep names and
+dates. Plain text, no emoji.
+
 {text}"""
 
 
@@ -71,9 +68,24 @@ def generate_text(prompt):
     return strip_symbols(_generate(prompt) or "")
 
 
+def condense_thread_part(text):
+    """Short notes on one stretch of a very long conversation. Raises if the AI call fails."""
+    return generate_text(THREAD_PART_PROMPT.format(text=text))
+
+
+def three_bullets(raw_text):
+    """Exactly three "- " bullets from whatever the model returned (bullets, numbered lines or a paragraph)."""
+    text = strip_symbols(raw_text or "")
+    lines = [re.sub(r"^\s*(?:[-*•]|\d+[.)])\s*", "", ln).strip() for ln in text.splitlines()]
+    items = [ln for ln in lines if ln and not ln.startswith("#") and not ln.lower().startswith("here")]
+    if len(items) == 1:  # one paragraph: split it into sentences
+        items = [x.strip() for x in re.split(r"(?<=[.!?])\s+", " ".join(items)) if x.strip()]
+    return "\n".join(f"- {item}" for item in items[:3])
+
+
 def summarize_thread(text):
-    """A short structured summary (as HTML) of a whole conversation. Raises if the AI call fails."""
-    return clean_summary_text(_generate(THREAD_PROMPT.format(text=text)))
+    """Three bullets (as HTML) on the core decisions and arguments of a conversation. Raises if the AI call fails."""
+    return clean_summary_text(three_bullets(_generate(THREAD_PROMPT.format(text=text))))
 
 
 def summarize_email(text):
