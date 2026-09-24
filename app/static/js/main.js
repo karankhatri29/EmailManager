@@ -77,6 +77,7 @@ async function pollSync() {
 }
 
 async function syncNow() {
+    if (!isDesktop()) setDrawer(false); // reveal the dashboard again after tapping Sync in the drawer
     try {
         await api('/api/sync', { method: 'POST', params: { time_filter: state.timeframe } });
         await pollSync();
@@ -130,15 +131,17 @@ async function boot() {
     }
 }
 
+// Below 1024px the sidebar is an off-canvas drawer (opened from the menu button); above it, a column
+// that can be collapsed. The CSS for both lives in index.html and keys off these two classes.
+const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
+
+function setDrawer(open) {
+    $('sidebar').classList.toggle('open', open);
+    $('menuBtn').setAttribute('aria-expanded', String(open));
+}
+
 function toggleSidebar() {
-    const sidebar = $('sidebar');
-    const collapsed = sidebar.classList.toggle('w-0');
-    sidebar.classList.toggle('w-64', !collapsed);
-    sidebar.classList.toggle('p-5', !collapsed);
-    sidebar.classList.toggle('p-0', collapsed);
-    $('sidebarContent').classList.toggle('opacity-0', collapsed);
-    $('sidebarContent').classList.toggle('pointer-events-none', collapsed);
-    $('toggleChevron').classList.toggle('rotate-180', collapsed);
+    $('sidebar').classList.toggle('collapsed');
     setTimeout(renderCharts, 310); // charts re-measure once the width has settled
 }
 
@@ -156,8 +159,13 @@ document.addEventListener('DOMContentLoaded', () => {
     $('tab-activity').addEventListener('click', () => switchTab('activity'));
     $('syncNow').addEventListener('click', syncNow);
     $('sidebarToggle').addEventListener('click', toggleSidebar);
+    $('menuBtn').addEventListener('click', () => setDrawer(true));
+    $('sidebarBackdrop').addEventListener('click', () => setDrawer(false));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setDrawer(false); });
+    window.matchMedia('(min-width: 1024px)').addEventListener('change', () => { setDrawer(false); renderCharts(); });
     $('timeFilter').addEventListener('change', async (event) => {
         state.timeframe = event.target.value;
+        if (!isDesktop()) setDrawer(false);
         await loadEmails();
     });
     $('logout').addEventListener('click', async () => {

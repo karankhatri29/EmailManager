@@ -47,7 +47,7 @@ export function renderAccountFilter() {
     const chip = (id, label, title) => {
         const active = state.accountFilter === id;
         return `<button data-account-filter="${id ?? ''}" aria-pressed="${active}" title="${esc(title)}"
-            class="px-3 py-1.5 rounded-full text-xs font-medium border transition cursor-pointer ${active
+            class="max-w-full truncate px-3 py-1.5 rounded-full text-xs font-medium border transition cursor-pointer ${active
                 ? 'bg-blue-600 border-blue-500 text-white'
                 : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700'}">${esc(label)}</button>`;
     };

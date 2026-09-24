@@ -69,8 +69,8 @@ async function renderTasks() {
                 <span class="px-2 py-0.5 rounded-full font-mono text-[9px] ${hot ? 'bg-red-500/10 border border-red-500/20 text-red-400' : 'bg-slate-700/30 border border-slate-600/30 text-slate-400'}">Tier ${t.sort_tier}</span>
             </div>
             <p class="text-slate-100 font-semibold text-sm leading-snug group-hover:text-blue-400 transition-colors">⚡ ${esc(t.task)}</p>
-            <div class="flex items-center gap-1.5 text-xs pt-1 border-t border-slate-800/60">
-                <span class="text-slate-500">⏱️ Deadline:</span>
+            <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs pt-1 border-t border-slate-800/60">
+                <span class="text-slate-500 whitespace-nowrap">⏱️ Deadline:</span>
                 <span class="font-medium ${hot ? 'text-amber-400' : 'text-slate-400'}">${esc(t.deadline)}</span>
                 ${mailbox ? `<span class="ml-auto text-[10px] text-slate-500 truncate max-w-[50%]" title="${esc(mailbox.email_address)}">${esc(providerLabel(mailbox))} · ${esc(mailbox.email_address)}</span>` : ''}
             </div>
@@ -127,9 +127,14 @@ export function renderCharts() {
         hovertemplate: `<b>${cat}</b><br>%{x}<br>Count: %{y}<extra></extra>`,
     }));
 
+    // Show only as many x labels as fit (about 56px each) so they never collide on narrow screens.
+    const fits = Math.max(2, Math.floor($('lineChart').clientWidth / 56));
+    const step = Math.ceil(keys.length / fits);
+
     Plotly.newPlot('lineChart', traces, {
         ...layoutBase,
-        xaxis: { showgrid: false, tickmode: 'array', tickvals: keys },
+        margin: { t: 20, b: 40, l: 36, r: 12 },
+        xaxis: { showgrid: false, tickmode: 'array', tickvals: keys.filter((_, i) => i % step === 0), tickangle: 0 },
         yaxis: { showgrid: true, gridcolor: '#1e293b', zeroline: false },
         hovermode: 'closest',
     }, { displayModeBar: false, responsive: true });
