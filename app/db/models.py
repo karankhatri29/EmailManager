@@ -17,6 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
+from .encrypted import EncryptedText
 
 
 def _now() -> datetime:
@@ -58,17 +59,19 @@ class Email(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     account_id: Mapped[int] = mapped_column(ForeignKey("mail_accounts.id", ondelete="CASCADE"), index=True)
     sender: Mapped[str] = mapped_column(String(512))
-    subject: Mapped[str] = mapped_column(Text)
-    body: Mapped[str] = mapped_column(Text)
+    subject: Mapped[str] = mapped_column(EncryptedText)  # encrypted at rest (see db/encrypted.py)
+    body: Mapped[str] = mapped_column(EncryptedText)  # encrypted at rest
     score: Mapped[float] = mapped_column(Float)
     category: Mapped[str] = mapped_column(String(64), index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
-    task: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    summary: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)  # encrypted at rest
+    task: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)  # an action line from the mail
 
     sender_address: Mapped[str] = mapped_column(String(320), default="", server_default="", index=True)
     thread_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
-    reason: Mapped[str | None] = mapped_column(Text, nullable=True)  # plain-English "why this category"
+    reason: Mapped[str | None] = mapped_column(
+        EncryptedText, nullable=True
+    )  # "why this category"; quotes the mail
     category_source: Mapped[str] = mapped_column(
         String(16), default="auto", server_default="auto"
     )  # auto|rule|user
@@ -83,7 +86,7 @@ class Email(Base):
     # What the text analysis found (see services/analysis.py); nlp_version 0 = not analysed yet
     due_date: Mapped[Day | None] = mapped_column(Date, nullable=True, index=True)
     due_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)  # deadline | event | asap
-    due_text: Mapped[str | None] = mapped_column(String(80), nullable=True)  # the words it was read from
+    due_text: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)  # the words it was read from
     due_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     due_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     nlp_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
@@ -113,7 +116,7 @@ class Activity(Base):
         ForeignKey("emails.id", ondelete="SET NULL"), nullable=True, unique=True
     )
     title: Mapped[str] = mapped_column(String(255))
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)  # encrypted at rest
     start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     all_day: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -176,7 +179,7 @@ class FollowUp(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     account_id: Mapped[int] = mapped_column(ForeignKey("mail_accounts.id", ondelete="CASCADE"), index=True)
     thread_id: Mapped[str] = mapped_column(String(128))
-    subject: Mapped[str] = mapped_column(Text)
+    subject: Mapped[str] = mapped_column(EncryptedText)  # encrypted at rest
     recipient: Mapped[str] = mapped_column(String(512))
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(16), default="waiting", server_default="waiting")
@@ -190,8 +193,8 @@ class Notification(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     kind: Mapped[str] = mapped_column(String(24))  # 'reminder' | 'followup' | 'urgent' | 'briefing'
-    title: Mapped[str] = mapped_column(String(255))
-    body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    title: Mapped[str] = mapped_column(EncryptedText)  # often names an email subject: encrypted at rest
+    body: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)
     ref: Mapped[str | None] = mapped_column(String(128), nullable=True)  # e.g. 'activity:12' or an email id
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -207,7 +210,7 @@ class ThreadSummary(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     thread_key: Mapped[str] = mapped_column(String(160))  # "<account_id>:<provider thread id>"
     message_count: Mapped[int] = mapped_column(Integer)
-    summary: Mapped[str] = mapped_column(Text)
+    summary: Mapped[str] = mapped_column(EncryptedText)  # encrypted at rest
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 

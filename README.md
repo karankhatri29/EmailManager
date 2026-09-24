@@ -116,11 +116,22 @@ The UI is arranged differently for each kind of screen (`static/css/adaptive.css
 ### Privacy and data
 The app has read-only access to mail (`gmail.readonly` / `Mail.Read`) and **stores email text** (sender, subject,
 the first 4,000 characters of the body, up to 20,000 for ticket mails, plus the priority, AI summary and derived
-tasks and bookings) in its database, **unencrypted**; only the OAuth tokens are encrypted and passwords are hashed.
+tasks and bookings) in its database. The **subject, body, AI summary and calendar notes are encrypted at rest**
+(`db/encrypted.py`, Fernet, using `ENCRYPTION_KEY`, the key that also protects the OAuth tokens); the sender address,
+dates, priority, short task titles and calendar titles stay readable because the database groups and sorts on them.
+Passwords are hashed. Encryption protects database files, dumps and backups, not against whoever runs the live
+server (it holds the key). Mail stored before encryption was on stays plaintext until you run
+`python -m scripts.encrypt_stored_mail` (`--check` shows how much is left; the app warns at startup). To rotate
+the key, put the old one in `ENCRYPTION_KEYS_PREVIOUS`, the new one in `ENCRYPTION_KEY`, run that script, then remove
+the old key. Back up `ENCRYPTION_KEY`: without it stored mail cannot be read. `ENCRYPT_EMAIL_TEXT=false` turns it off.
+The conversion script also compacts the database (`VACUUM`), and SQLite runs with `secure_delete` on: without both,
+databases keep the old readable bytes in unused space after an update or delete. Backups made before the conversion
+still contain plaintext. SQL cannot search encrypted columns, so filter in Python after loading (`repositories/emails.py`).
 Attachments and HTML are not stored. Urgent and important emails are sent to Google Gemini for summaries, so leave
 `GEMINI_API_KEY` empty (and no `GOOGLE_API_KEY` in the environment) to send nothing. Disconnecting a mailbox deletes its stored mail. The full plain-language note
 is served at `/privacy` (public, so it can be linked from the OAuth consent screen) and summarised in Settings.
-Not built yet: delete-my-account, data export, encryption of stored mail, and an automatic retention limit.
+Not built yet: delete-my-account, data export, encrypting the sender / task-title / calendar-title columns (needs a
+schema change), and an automatic retention limit.
 
 ### Google OAuth setup
 Create an OAuth client in Google Cloud Console (APIs & Services → Credentials), enable the Gmail API, and either

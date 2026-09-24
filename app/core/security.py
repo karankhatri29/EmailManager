@@ -4,7 +4,7 @@ import time
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
 
 from .config import get_settings
 
@@ -28,11 +28,15 @@ def new_calendar_token() -> str:
     return secrets.token_urlsafe(24)
 
 
-def _fernet() -> Fernet:
-    key = get_settings().encryption_key
-    if not key:
+def _fernet() -> MultiFernet:
+    """Encrypts with ENCRYPTION_KEY; decrypts with it or any ENCRYPTION_KEYS_PREVIOUS (so keys can be rotated)."""
+    settings = get_settings()
+    if not settings.encryption_key:
         raise RuntimeError("ENCRYPTION_KEY is not set. Generate one with: python -m scripts.generate_keys")
-    return Fernet(key.encode())
+    keys = [settings.encryption_key] + [
+        k.strip() for k in settings.encryption_keys_previous.split(",") if k.strip()
+    ]
+    return MultiFernet([Fernet(k.encode()) for k in keys])
 
 
 def encrypt(plaintext: str) -> str:

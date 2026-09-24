@@ -12,6 +12,9 @@ def enable_sqlite_foreign_keys(engine: Engine) -> None:
     @event.listens_for(engine, "connect")
     def _set_pragma(dbapi_connection, _record):
         dbapi_connection.execute("PRAGMA foreign_keys=ON")
+        # Overwrite deleted / replaced content with zeros. Without this SQLite leaves the old bytes in the file, so
+        # "disconnect a mailbox" (and re-encrypting old mail) would not really remove the readable text.
+        dbapi_connection.execute("PRAGMA secure_delete=ON")
 
 
 _url = get_settings().database_url

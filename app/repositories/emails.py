@@ -71,6 +71,7 @@ def mark_synced(db: Session, account_id: int, timeframe: str) -> None:
 
 INBOX_STATES = ("open", "done", "snoozed", "all")
 MAX_SEARCH_TERMS = 8
+MAX_TEXT_SCAN = 3000  # newest rows examined by a word search (subject and body are matched after decrypting)
 
 
 def get_for_user(db: Session, user_id: int, email_id: str) -> Email | None:
@@ -136,21 +137,19 @@ def search_inbox(
     by_state = state_filter(state)
     if by_state is not None:
         conditions.append(by_state)
-    for term in (q or "").split()[:MAX_SEARCH_TERMS]:
-        pattern = _like(term)
-        conditions.append(
-            or_(
-                Email.subject.ilike(pattern, escape="\\"),
-                Email.sender.ilike(pattern, escape="\\"),
-                Email.body.ilike(pattern, escape="\\"),
-            )
+    terms = [t.lower() for t in (q or "").split()[:MAX_SEARCH_TERMS]]
+    if not terms:
+        total = db.scalar(select(func.count()).select_from(Email).where(*conditions)) or 0
+        rows = db.scalars(
+            select(Email).where(*conditions).order_by(Email.date.desc()).limit(limit).offset(offset)
         )
+        return list(rows), total
 
-    total = db.scalar(select(func.count()).select_from(Email).where(*conditions)) or 0
-    rows = db.scalars(
-        select(Email).where(*conditions).order_by(Email.date.desc()).limit(limit).offset(offset)
-    )
-    return list(rows), total
+    # Subject and body are encrypted in the database, so the words are matched here, on the rows the plain
+    # columns (owner, mailbox, category, dates, state) already narrowed down. Newest first, capped.
+    candidates = db.scalars(select(Email).where(*conditions).order_by(Email.date.desc()).limit(MAX_TEXT_SCAN))
+    hits = [e for e in candidates if all(t in f"{e.subject} {e.sender} {e.body}".lower() for t in terms)]
+    return hits[offset : offset + limit], len(hits)
 
 
 def list_matching_rule(db: Session, user_id: int, kind: str, pattern: str) -> list[Email]:
@@ -166,8 +165,9 @@ def list_matching_rule(db: Session, user_id: int, kind: str, pattern: str) -> li
             )
         )
     else:
-        like = _like(pattern)
-        query = query.where(or_(Email.subject.ilike(like, escape="\\"), Email.body.ilike(like, escape="\\")))
+        # Text is encrypted in the database: candidates are matched here (callers re-check with the rule engine).
+        needle = pattern.lower()
+        return [e for e in db.scalars(query) if needle in f"{e.subject} {e.body}".lower()]
     return list(db.scalars(query))
 
 

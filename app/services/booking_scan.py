@@ -10,7 +10,7 @@ import threading
 from concurrent.futures import Future, ThreadPoolExecutor, wait
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from ..core.config import get_settings
 from ..db.models import Email, MailAccount
@@ -36,11 +36,9 @@ def scan_account(db, account: MailAccount) -> int:
     try:
         found = search_booking_ids(provider, SCAN_DAYS, SCAN_LIMIT)
         stored_ids = {i: emails_repo.make_email_id(account.id, i) for i in found}
-        lengths = dict(
-            db.execute(
-                select(Email.id, func.length(Email.body)).where(Email.id.in_(list(stored_ids.values())))
-            ).all()
-        )
+        # Lengths are measured on the decrypted text (in SQL they would be the ciphertext's length).
+        rows = db.execute(select(Email.id, Email.body).where(Email.id.in_(list(stored_ids.values())))).all()
+        lengths = {email_id: len(body or "") for email_id, body in rows}
 
         added = completed = 0
         fresh: list[dict] = []

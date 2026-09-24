@@ -22,6 +22,8 @@ from .api import (
 )
 from .core.config import get_settings
 from .core.logging import configure_logging
+from .db.encrypted import warn_if_plaintext
+from .db.session import engine
 from .services.background import start_periodic_jobs, start_periodic_sync
 
 APP_DIR = Path(__file__).resolve().parent
@@ -31,6 +33,7 @@ SESSION_MAX_AGE = 14 * 24 * 3600
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    warn_if_plaintext(engine)
     stops = []
     if settings.inprocess_sync:
         stops = [
