@@ -1,0 +1,14 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+.env
+credentials.json
+token.json
+*.db
+tests
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
