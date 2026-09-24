@@ -177,6 +177,7 @@ def test_run_periodic_jobs_runs_each_job_and_reports(session_factory, db, user, 
             "cleanups": 0,
             "reminders": 1,
             "followups": 1,
+            "retention": 0,
             "pruned": 0,
         }
 

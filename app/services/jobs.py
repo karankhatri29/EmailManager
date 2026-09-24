@@ -4,13 +4,15 @@ Each job is idempotent (it records what it did), so running it often, or twice, 
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from ..db.models import Activity, User
+from ..core.config import get_settings
+from ..db.models import Activity, ThreadSummary, User
 from ..db.session import SessionLocal
+from ..repositories import emails as emails_repo
 from ..repositories import followups as followups_repo
 from ..repositories import notifications as notifications_repo
 from ..repositories import settings as settings_repo
@@ -150,6 +152,20 @@ def nudge_followups(db: Session, now: datetime | None = None) -> int:
     return len(due)
 
 
+def enforce_retention(db: Session, now: datetime | None = None) -> int:
+    """Deletes stored mail (and cached conversation summaries) older than RETENTION_DAYS. Returns the mail count."""
+    days = get_settings().retention_days
+    if not days:
+        return 0
+    now = now or datetime.now(timezone.utc)
+    removed = emails_repo.delete_older_than(db, days, now)
+    db.execute(delete(ThreadSummary).where(ThreadSummary.created_at < now - timedelta(days=days)))
+    db.commit()
+    if removed:
+        logger.info("Retention: deleted %s emails older than %s days", removed, days)
+    return removed
+
+
 def run_periodic_jobs(now: datetime | None = None) -> dict[str, int]:
     """Runs every recurring job once, each in its own session so one failure cannot stop the others."""
     results = {}
@@ -159,6 +175,7 @@ def run_periodic_jobs(now: datetime | None = None) -> dict[str, int]:
         ("cleanups", run_auto_cleanups),
         ("reminders", fire_due_reminders),
         ("followups", nudge_followups),
+        ("retention", enforce_retention),
         ("pruned", lambda db, now=None: notifications_repo.prune(db)),
     ):
         try:

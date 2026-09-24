@@ -40,6 +40,7 @@ ENCRYPTION_KEY**: without it stored mail cannot be read).
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | from the Web client |
 | `GOOGLE_REDIRECT_URI` | `https://<your-project>.vercel.app/api/accounts/google/callback` |
 | `CRON_SECRET` | a long random string (Vercel Cron sends it automatically) |
+| `RETENTION_DAYS` | optional, default `180`: older stored mail is deleted so the free database stays small |
 | `ALLOWED_EMAILS` | `you@gmail.com,friend@gmail.com` (who may create an account) |
 | `GEMINI_API_KEY` | optional; leave out to skip AI summaries |
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI` | optional (Outlook) |

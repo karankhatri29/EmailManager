@@ -49,6 +49,11 @@ class Settings(BaseSettings):
 
     database_url: str = f"sqlite:///{(BASE_DIR / 'app.db').as_posix()}"
 
+    @field_validator("retention_days")
+    @classmethod
+    def _retention_floor(cls, days: int) -> int:
+        return 0 if days <= 0 else max(days, 30)
+
     @field_validator("database_url")
     @classmethod
     def _use_the_psycopg_driver(cls, url: str) -> str:
@@ -71,6 +76,9 @@ class Settings(BaseSettings):
     # Who may create an account here: comma separated email addresses. Empty = anyone (open sign-up).
     # Use it for a private group; it does not affect which Gmail / Outlook mailboxes a member connects.
     allowed_emails: str = ""
+    # Stored mail older than this many days is deleted automatically (0 = keep forever). Keeps the database from
+    # growing without limit on small hosted databases; values between 1 and 29 are raised to 30.
+    retention_days: int = 180
     session_https_only: bool = False  # set true behind HTTPS in production
     public_base_url: str = "http://localhost:8000"  # used to build calendar feed links
 

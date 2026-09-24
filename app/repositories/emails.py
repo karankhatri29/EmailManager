@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import delete as sql_delete
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
@@ -35,6 +36,22 @@ def list_in_window(
     if account_id is not None:
         query = query.where(Email.account_id == account_id)
     return list(db.scalars(query.order_by(Email.date.desc())))
+
+
+def delete_older_than(db: Session, days: int, now: datetime | None = None) -> int:
+    """Deletes stored mail dated more than `days` ago and returns how many were removed.
+
+    Mail with a deadline or event date that is still ahead is kept, so a flight booked long ago is not dropped
+    before the trip. Calendar items made from a deleted mail stay (their link to the mail is cleared)."""
+    now = now or datetime.now(timezone.utc)
+    result = db.execute(
+        sql_delete(Email).where(
+            Email.date < now - timedelta(days=days),
+            or_(Email.due_date.is_(None), Email.due_date < now.date()),
+        )
+    )
+    db.commit()
+    return getattr(result, "rowcount", 0) or 0
 
 
 def list_pending_summaries(db: Session, account_id: int) -> list[Email]:
