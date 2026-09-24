@@ -109,7 +109,7 @@ async function renderNewsletters(body) {
     body.innerHTML = `
         <div class="${card}">
             <div class="flex flex-wrap items-center justify-between gap-2">${heading('Newsletters you never open', 'Unread for months. Cleaning up unsubscribes when the sender allows it, then mutes and archives them here.')}
-                ${unopened.length ? `<button type="button" class="${small}" data-clean-all>${icon('sparkle')}Clean up all ${unopened.length}</button>` : ''}</div>
+                ${unopened.length > 1 ? `<button type="button" class="${small}" data-clean-all>${icon('sparkle')}Clean up all ${unopened.length}</button>` : ''}</div>
             ${unopened.length ? `<ul class="divide-y divide-slate-700/40">${unopenedRows}</ul>` : empty('Nothing here. Senders show up once you have not opened three or more of their emails over your cleanup period (Settings).')}
         </div>
         <div class="${card}">

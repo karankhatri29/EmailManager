@@ -63,12 +63,12 @@ def greeting(hour: int) -> str:
     return "Good morning" if hour < 12 else "Good afternoon" if hour < 18 else "Good evening"
 
 
-def _promo_highlights(subjects: list[str]) -> str | None:
+def _promo_highlights(subjects: list[str], use_ai: bool = True) -> str | None:
     if not subjects:
         return None
     try:
-        if not ai_summarizer.is_configured():
-            raise RuntimeError("no AI key configured")
+        if not use_ai or not ai_summarizer.is_configured():
+            raise RuntimeError("AI not used")
         text = ai_summarizer.generate_text(PROMO_PROMPT.format(lines="\n".join(f"- {s}" for s in subjects)))
         if text:
             return text
@@ -77,7 +77,10 @@ def _promo_highlights(subjects: list[str]) -> str | None:
     return "Top subjects: " + "; ".join(subjects[:3])
 
 
-def build_briefing(db: Session, user: User, settings: UserSettings, now: datetime | None = None) -> dict:
+def build_briefing(
+    db: Session, user: User, settings: UserSettings, now: datetime | None = None, use_ai: bool = True
+) -> dict:
+    """Today's briefing. use_ai=False skips the AI sentence about promotions (for screens that must be quick)."""
     now = now or datetime.now(timezone.utc)
     tz = _tz(settings.timezone)
     today = now.astimezone(tz).date()
@@ -150,7 +153,7 @@ def build_briefing(db: Session, user: User, settings: UserSettings, now: datetim
             "top_senders": [
                 {"sender": s, "count": c} for s, c in sorted(sender_counts.items(), key=lambda kv: -kv[1])[:3]
             ],
-            "highlights": _promo_highlights([e.subject for e in promos[:PROMO_SUBJECTS_FOR_AI]]),
+            "highlights": _promo_highlights([e.subject for e in promos[:PROMO_SUBJECTS_FOR_AI]], use_ai),
         },
         "classes": [
             {"title": s.title, "time": time_range(s), "room": s.room}

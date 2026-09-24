@@ -27,5 +27,9 @@ jobs:
           ruff format --check app tests scripts alembic
       - name: Type check
         run: mypy
+      - name: Front-end syntax
+        if: matrix.python-version == '3.11'
+        run: |
+          for f in app/static/js/*.js; do node --experimental-default-type=module --check "$f"; done
       - name: Test
         run: pytest --cov=app --cov-report=term-missing

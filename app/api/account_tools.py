@@ -85,7 +85,7 @@ def update_settings(
 @router.get("/briefing", response_model=BriefingOut)
 def read_briefing(user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Today's briefing, built fresh from the stored mail and calendar."""
-    return briefing_service.build_briefing(db, user, settings_repo.get_or_create(db, user.id))
+    return briefing_service.build_briefing(db, user, settings_repo.get_or_create(db, user.id), use_ai=False)
 
 
 @router.post("/briefing/send", response_model=BriefingSent)

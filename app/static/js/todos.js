@@ -188,7 +188,7 @@ function row(t) {
                     ${t.source === 'email' ? `<span class="inline-flex items-center gap-1 text-slate-400" title="Found in an email">${icon('mail', 'w-3.5 h-3.5')}from email</span>` : ''}
                 </div>
             </div>
-            <button type="button" data-edit="${t.id}" class="icon-btn shrink-0 ${FOCUS}" aria-label="Edit &quot;${esc(t.title)}&quot;">${icon('file', 'w-4 h-4')}</button>
+            <button type="button" data-edit="${t.id}" class="icon-btn shrink-0 ${FOCUS}" aria-label="Edit &quot;${esc(t.title)}&quot;">${icon('edit', 'w-4 h-4')}</button>
             <button type="button" data-delete="${t.id}" class="icon-btn shrink-0 ${FOCUS}" aria-label="Delete &quot;${esc(t.title)}&quot;">${icon('trash', 'w-4 h-4')}</button>
         </li>`;
 }

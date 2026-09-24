@@ -11,6 +11,7 @@ import html
 import logging
 import re
 import time as time_module
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, time, timezone
 
 from sqlalchemy.orm import Session
@@ -65,6 +66,8 @@ def _pick_by_score(promos: list[Email]) -> list[Email]:
     return picked
 
 
+AI_TIMEOUT_SECONDS = 6
+_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="digest-ai")
 _AI_CACHE: dict[tuple[str, ...], tuple[float, str]] = {}
 _AI_CACHE_SECONDS = 600  # the digest can be opened often; the same subjects give the same answer
 
@@ -81,7 +84,9 @@ def _ai_answer(subjects: tuple[str, ...]) -> str | None:
         return None
     try:
         lines = "\n".join(f"{n}. {subject}" for n, subject in enumerate(subjects, 1))
-        answer = ai_summarizer.generate_text(_ORDER_PROMPT.format(lines=lines))
+        # A slow or failing AI must not hold up the screen: give it a few seconds, then score the subjects.
+        future = _POOL.submit(ai_summarizer.generate_text, _ORDER_PROMPT.format(lines=lines))
+        answer = future.result(timeout=AI_TIMEOUT_SECONDS)
     except Exception:
         logger.info("Deal picking by AI unavailable; scoring subjects instead", exc_info=True)
         return None

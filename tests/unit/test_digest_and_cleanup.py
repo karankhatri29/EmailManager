@@ -251,3 +251,19 @@ def test_the_same_subjects_are_only_sent_to_the_ai_once(db, user, account):
         digest.build_digest(db, user, settings, NOW)
         digest.build_digest(db, user, settings, NOW)
     assert ai.call_count == 1
+
+
+def test_a_slow_ai_does_not_hold_up_the_digest(db, user, account):
+    import time as clock
+
+    emails_repo.upsert_many(db, [_promo(account, "1", "50% off everything")])
+
+    def slow(prompt):
+        clock.sleep(1)
+        return "1"
+
+    with patch(AI, side_effect=slow), patch.object(digest, "AI_TIMEOUT_SECONDS", 0.05):
+        started = clock.monotonic()
+        d = digest.build_digest(db, user, settings_repo.get_or_create(db, user.id), NOW)
+    assert clock.monotonic() - started < 0.8
+    assert d["deals"][0]["subject"] == "50% off everything"  # chosen by scoring instead
