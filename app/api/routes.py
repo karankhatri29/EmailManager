@@ -14,6 +14,12 @@ def index(request: Request):
     return templates.TemplateResponse(request, "index.html")
 
 
+@router.get("/privacy", response_class=HTMLResponse, include_in_schema=False)
+def privacy(request: Request):
+    """What the app reads, stores and shares. Public: it is linked from the sign-in screen and OAuth consent."""
+    return templates.TemplateResponse(request, "privacy.html")
+
+
 @router.get("/healthz")
 def healthz():
     return {"status": "ok"}

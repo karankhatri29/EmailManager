@@ -92,6 +92,7 @@
                 <span id="authSwitchText">Don't have an account?</span>
                 <button id="authSwitch" type="button" class="text-blue-400 hover:text-blue-300 font-semibold underline cursor-pointer">Create one</button>
             </p>
+            <p class="text-xs text-slate-500 mt-4 text-center">Read-only access to your mail. <a href="/privacy" class="underline hover:text-fg" id="authPrivacy">How your data is handled</a></p>
         </div>
     </section>
 
@@ -484,6 +485,17 @@
                         <option value="Last 1 Month">Last 30 days</option>
                     </select>
                 </div>
+            </section>
+
+            <section id="privacyNote" class="space-y-3">
+                <h3 class="text-[0.68rem] font-bold text-slate-400 uppercase tracking-wider">Privacy and your data</h3>
+                <ul class="space-y-2 text-xs text-slate-300 leading-relaxed">
+                    <li><b class="text-fg">Read-only.</b> The app cannot send, delete or change your email.</li>
+                    <li><b class="text-fg">Email text is stored</b> in this app's database (not encrypted there) so the dashboard is fast. Attachments and images are not stored.</li>
+                    <li><b class="text-fg">AI summaries:</b> urgent and important emails are sent to Google Gemini, if the operator set it up.</li>
+                    <li><b class="text-fg">To delete a mailbox's stored mail,</b> disconnect it (the &times; next to it in the menu).</li>
+                </ul>
+                <a href="/privacy" target="_blank" rel="noopener" class="inline-block text-xs font-bold text-blue-400 hover:text-blue-300 underline">Read the full privacy note</a>
             </section>
 
             <div class="flex items-center gap-2 pt-1">

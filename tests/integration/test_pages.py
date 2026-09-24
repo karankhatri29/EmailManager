@@ -104,3 +104,26 @@ def test_trips_view_and_navigation_exist_on_every_screen_size(client):
         assert element in html, element
     assert html.count('data-nav="trips"') == 2  # phone bottom bar + tablet rail
     assert client.get("/static/js/trips.js").status_code == 200
+
+
+def test_privacy_note_is_public_and_says_the_uncomfortable_things_plainly(client):
+    r = client.get(
+        "/privacy"
+    )  # no login: it must be reachable from the sign-in screen and the OAuth consent screen
+    assert r.status_code == 200
+    text = r.text.lower()
+    for statement in (
+        "read-only",
+        "stores the text of your emails",
+        "not encrypted",
+        "gemini",
+        "disconnecting a mailbox",
+        "attachments",
+    ):
+        assert statement in text, statement
+
+
+def test_privacy_is_linked_from_sign_in_and_settings(client):
+    html = client.get("/").text
+    assert html.count('href="/privacy"') == 2  # sign-in screen + Settings
+    assert 'id="privacyNote"' in html

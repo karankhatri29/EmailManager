@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-accent="violet" data-density="comfortable" data-motion="auto">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="color-scheme" content="dark light">
+    <title>Privacy and your data - Email Prioritizer</title>
+    <script>
+        (function () {
+            var root = document.documentElement, prefs = {};
+            try { prefs = JSON.parse(localStorage.getItem('ep-prefs-v1') || '{}'); } catch (e) {}
+            var deviceLight = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches;
+            root.dataset.theme = prefs.theme === 'light' || prefs.theme === 'dark' ? prefs.theme : (deviceLight ? 'light' : 'dark');
+            if (['pink', 'blue', 'mint', 'sunset'].indexOf(prefs.accent) > -1) root.dataset.accent = prefs.accent;
+        })();
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="{{ url_for('static', path='js/tailwind-config.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/theme.css') }}">
+    <style>
+        body { min-height: 100vh; }
+        .note h2 { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.02em; color: rgb(var(--fg)); margin-bottom: 0.6rem; }
+        .note ul { list-style: none; display: grid; gap: 0.55rem; }
+        .note li { position: relative; padding-left: 1.1rem; font-size: 0.92rem; line-height: 1.55; color: rgb(var(--slate-200)); }
+        .note li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: 0.4rem; height: 0.4rem; border-radius: 9999px; background: var(--grad); }
+        .note b { color: rgb(var(--fg)); }
+        .note a { color: hsl(var(--brand-h) 88% var(--chip-l)); text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <main class="relative z-[1] max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-5">
+        <a href="/" class="inline-flex items-center gap-2 text-sm font-semibold text-slate-300 hover:text-fg">&larr; Back to the app</a>
+
+        <header>
+            <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-fg">Privacy and your data</h1>
+            <p class="text-sm text-slate-400 mt-2">What this app reads from your mailbox, what it keeps, and who can see it. Last updated 24 September 2026.</p>
+        </header>
+
+        <section class="glass-card p-5 sm:p-6 note tone-good" style="border-left: 4px solid hsl(var(--tile-h) 90% 58%)">
+            <h2>The short version</h2>
+            <ul>
+                <li>The app has <b>read-only</b> access. It cannot send, delete, move or change your email.</li>
+                <li>Yes, <b>it stores the text of your emails</b> in its database so the dashboard is fast. That text is <b>not encrypted</b> inside the database.</li>
+                <li>Emails ranked urgent or important are sent to <b>Google's Gemini AI</b> to write the summary, if the person running the app has set that up.</li>
+                <li>Disconnecting a mailbox <b>deletes its stored mail</b>. There are no ads, no trackers and nothing is sold.</li>
+            </ul>
+        </section>
+
+        <section class="glass-card p-5 sm:p-6 note">
+            <h2>What the app can read</h2>
+            <ul>
+                <li><b>Gmail:</b> the <code>gmail.readonly</code> permission. <b>Outlook / Microsoft 365:</b> <code>Mail.Read</code>, <code>User.Read</code> and <code>offline_access</code> (so it can keep syncing without you signing in each time).</li>
+                <li>It looks at recent mail (the last day, week or month you choose) and, for the Trips tab, searches up to 180 days back for ticket and booking confirmations.</li>
+            </ul>
+        </section>
+
+        <section class="glass-card p-5 sm:p-6 note">
+            <h2>What is stored</h2>
+            <ul>
+                <li><b>For each email:</b> sender, subject, the message text (the first 4,000 characters; up to 20,000 for ticket and booking mails), the date, the priority the app gave it, and the AI summary if one was made.</li>
+                <li><b>Derived from your mail:</b> tasks and deadlines, and the trips and tickets shown on the Trips tab (flights, trains, movies and so on).</li>
+                <li><b>Your account:</b> your email address, a <b>hashed</b> password (never the password itself), the mailboxes you connected, and the calendar items you or the app created.</li>
+                <li><b>Your access tokens</b> for Gmail / Outlook are stored <b>encrypted</b>.</li>
+                <li><b>Not stored:</b> attachments, images, or the original HTML of messages.</li>
+            </ul>
+        </section>
+
+        <section class="glass-card p-5 sm:p-6 note">
+            <h2>Where it is stored, and who can see it</h2>
+            <ul>
+                <li>In the app's database on the server where it runs (a local file, or a PostgreSQL database). Email text is <b>readable there</b>, so anyone who runs the server or can open the database or its backups can read it. Only the access tokens are encrypted.</li>
+                <li><b>Google Gemini:</b> the text of urgent and important emails (up to 4,000 characters each) is sent to Google's Gemini API to create summaries. If no Gemini key is configured, nothing is sent. How Google handles that data depends on the API plan the operator uses, so check Google's terms if that matters to you.</li>
+                <li><b>Gmail and Microsoft</b> see the app connecting to your account, as they do for any app you authorise.</li>
+                <li>Your browser loads fonts from Google Fonts and styling from the Tailwind CDN. Those services can see your IP address and browser type, but never your email.</li>
+                <li>The app does not use your mail to train anything, has no analytics or advertising, and does not sell or share your data.</li>
+            </ul>
+        </section>
+
+        <section class="glass-card p-5 sm:p-6 note">
+            <h2>On your device</h2>
+            <ul>
+                <li>Your settings (theme, accent colour, dashboard choices) are saved in this browser's local storage. They never include mail.</li>
+                <li>A signed session cookie keeps you signed in.</li>
+                <li>Your <b>calendar link</b> is a secret address: anyone who has it can see your scheduled items. You can create a new one at any time.</li>
+            </ul>
+        </section>
+
+        <section class="glass-card p-5 sm:p-6 note">
+            <h2>Your controls</h2>
+            <ul>
+                <li><b>Disconnect a mailbox</b> (the &times; next to it in the menu). This deletes the mail stored from it, its sync history and the tasks created from those emails, and asks Google to revoke the access token. For Outlook, also remove the app at <a href="https://account.microsoft.com/privacy/app-access" rel="noopener noreferrer">account.microsoft.com/privacy/app-access</a>. For Google you can check <a href="https://myaccount.google.com/permissions" rel="noopener noreferrer">myaccount.google.com/permissions</a>.</li>
+                <li>Delete any calendar item yourself from the Activity tab.</li>
+                <li>Not available yet: a one-click "delete my whole account" and an automatic limit on how long mail is kept. To have your account and data removed today, ask the person who runs this app.</li>
+            </ul>
+        </section>
+    </main>
+</body>
+</html>

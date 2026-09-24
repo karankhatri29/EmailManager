@@ -113,6 +113,15 @@ The UI is arranged differently for each kind of screen (`static/css/adaptive.css
 | Laptop (1024-1535px) | sidebar + top tabs | two columns (numbers/charts, up next) |
 | Desktop (>= 1536px) | sidebar + top tabs | wide main area with six KPIs in a row, up next on the right |
 
+### Privacy and data
+The app has read-only access to mail (`gmail.readonly` / `Mail.Read`) and **stores email text** (sender, subject,
+the first 4,000 characters of the body, up to 20,000 for ticket mails, plus the priority, AI summary and derived
+tasks and bookings) in its database, **unencrypted**; only the OAuth tokens are encrypted and passwords are hashed.
+Attachments and HTML are not stored. Urgent and important emails are sent to Google Gemini for summaries, so leave
+`GEMINI_API_KEY` empty (and no `GOOGLE_API_KEY` in the environment) to send nothing. Disconnecting a mailbox deletes its stored mail. The full plain-language note
+is served at `/privacy` (public, so it can be linked from the OAuth consent screen) and summarised in Settings.
+Not built yet: delete-my-account, data export, encryption of stored mail, and an automatic retention limit.
+
 ### Google OAuth setup
 Create an OAuth client in Google Cloud Console (APIs & Services → Credentials), enable the Gmail API, and either
 put the downloaded JSON at `./credentials.json` or set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. For a web
