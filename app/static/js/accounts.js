@@ -31,7 +31,7 @@ export function renderAccounts() {
             <div class="text-[10px] text-slate-500 mt-1 ml-4">${esc(providerLabel(a))}</div>
             ${a.status === 'needs_reauth' ? `
                 <div class="mt-2 ml-4 text-[11px] text-red-300">Access expired or revoked.
-                    <button data-reconnect="${esc(a.provider)}" class="underline hover:text-white cursor-pointer">Reconnect</button>
+                    <button data-reconnect="${esc(a.provider)}" class="underline hover:text-fg cursor-pointer">Reconnect</button>
                 </div>` : ''}
         </div>`).join('');
 }

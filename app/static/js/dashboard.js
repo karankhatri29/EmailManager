@@ -1,6 +1,7 @@
 import { api } from './api.js';
 import { CATEGORY_COLORS, state } from './state.js';
 import { providerLabel } from './accounts.js';
+import { cssVar } from './settings.js';
 import { $, esc, senderName } from './util.js';
 
 const URGENT = 'Urgent / Action Required';
@@ -28,10 +29,29 @@ export async function loadEmails({ refresh = false, silent = false } = {}) {
 
 // --- rendering -----------------------------------------------------------------------------------
 
+// "karan.singh@x.com" -> "Karan"
+function firstName() {
+    const local = String((state.user && state.user.email) || '').split('@')[0];
+    const word = local.split(/[._+-]/)[0].replace(/\d+/g, '');
+    return word ? word.charAt(0).toUpperCase() + word.slice(1) : '';
+}
+
+function renderHero(total, urgent) {
+    const name = firstName();
+    $('heroTitle').textContent = name ? `Hey ${name} 👋` : 'Hey 👋';
+    let line;
+    if (total === 0) line = state.accounts.length ? 'Nothing new in this window. Inbox zen 🧘' : 'Connect a mailbox and I will sort it out for you.';
+    else if (urgent > 0) line = `${urgent} ${urgent === 1 ? 'thing needs' : 'things need'} you first. You got this 💪`;
+    else line = 'Nothing urgent right now. Enjoy it 🌴';
+    $('heroSub').textContent = line;
+}
+
 export async function renderDashboard() {
+    const urgent = state.emails.filter((e) => e.category === URGENT).length;
     $('kpi-total').textContent = state.emails.length;
-    $('kpi-urgent').textContent = state.emails.filter((e) => e.category === URGENT).length;
+    $('kpi-urgent').textContent = urgent;
     $('kpi-important').textContent = state.emails.filter((e) => e.category === 'Important').length;
+    renderHero(state.emails.length, urgent);
 
     await renderTasks();
     renderCharts();
@@ -84,7 +104,7 @@ export function renderCharts() {
     const layoutBase = {
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
-        font: { color: '#94a3b8', family: 'Inter, sans-serif' },
+        font: { color: cssVar('--chart-text'), family: 'Plus Jakarta Sans, Inter, sans-serif' },
         margin: { t: 20, b: 30, l: 40, r: 15 },
         showlegend: false,
     };
@@ -96,8 +116,12 @@ export function renderCharts() {
         values: Object.values(counts),
         labels: Object.keys(counts),
         type: 'pie',
-        hole: 0.6,
-        marker: { colors: Object.keys(counts).map((c) => CATEGORY_COLORS[c] || '#888') },
+        hole: 0.66,
+        sort: false,
+        marker: {
+            colors: Object.keys(counts).map((c) => CATEGORY_COLORS[c] || '#888'),
+            line: { color: cssVar('--chart-ring'), width: 3 }, // gaps between slices match the card
+        },
         textinfo: 'percent',
         textposition: 'inside',
     }], { ...layoutBase, margin: { t: 0, b: 20, l: 30, r: 10 } }, { displayModeBar: false, responsive: true });
@@ -135,7 +159,7 @@ export function renderCharts() {
         ...layoutBase,
         margin: { t: 20, b: 40, l: 36, r: 12 },
         xaxis: { showgrid: false, tickmode: 'array', tickvals: keys.filter((_, i) => i % step === 0), tickangle: 0 },
-        yaxis: { showgrid: true, gridcolor: '#1e293b', zeroline: false },
+        yaxis: { showgrid: true, gridcolor: cssVar('--chart-grid'), zeroline: false },
         hovermode: 'closest',
     }, { displayModeBar: false, responsive: true });
 }
@@ -155,7 +179,7 @@ export function openEmailDrawer(emailId) {
 
     $('drawerContent').innerHTML = `
         <div class="p-6 border-b border-slate-700/50 bg-slate-800/30 shrink-0">
-            <h2 class="text-lg font-bold text-white leading-tight mb-2">${esc(email.subject)}</h2>
+            <h2 class="text-lg font-bold text-fg leading-tight mb-2">${esc(email.subject)}</h2>
             <p class="text-slate-400 text-sm"><strong>From:</strong> ${esc(email.sender)}</p>
             <p class="text-slate-500 text-xs mt-1">${esc(new Date(email.date).toLocaleString())}${account ? ` · ${esc(providerLabel(account))} · ${esc(account.email_address)}` : ''}</p>
             <div class="mt-3 flex items-center gap-2 text-[11px]">
@@ -195,4 +219,5 @@ export function initDashboard() {
     $('drawerBackdrop').addEventListener('click', closeEmailDrawer);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeEmailDrawer(); });
     window.addEventListener('resize', renderCharts);
+    document.addEventListener('themechange', renderCharts); // new theme, new chart colours
 }

@@ -47,7 +47,7 @@ dev = [
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["templates/*", "static/*"]
+app = ["templates/*", "static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
