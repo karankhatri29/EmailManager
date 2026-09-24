@@ -10,7 +10,7 @@ import threading
 from concurrent.futures import Future, ThreadPoolExecutor, wait
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from ..core.config import get_settings
 from ..db.models import Email, MailAccount
@@ -51,7 +51,7 @@ def scan_account(db, account: MailAccount) -> int:
                 message["id"] = email_id
                 fresh.append(message)
             else:  # stored earlier, but cut off at 4000 characters: complete it
-                db.execute(Email.__table__.update().where(Email.id == email_id).values(body=message["body"]))
+                db.execute(update(Email).where(Email.id == email_id).values(body=message["body"]))
                 completed += 1
     except ProviderAuthError as exc:
         accounts_repo.mark_needs_reauth(db, account.id, str(exc))

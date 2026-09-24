@@ -12,6 +12,7 @@ mail gives no time) and shown as written.
 
 import re
 from datetime import datetime, timedelta
+from typing import Any
 
 import dateparser
 from icalendar import Calendar, Event
@@ -154,7 +155,7 @@ _DATE_SETTINGS = {"DATE_ORDER": "DMY", "PREFER_DATES_FROM": "future", "PREFER_DA
 
 
 def _parse(date_text: str, time_text: str | None, base: datetime | None) -> tuple[datetime | None, bool]:
-    settings = dict(_DATE_SETTINGS)
+    settings: dict[str, Any] = dict(_DATE_SETTINGS)
     if base is not None:
         settings["RELATIVE_BASE"] = base.replace(tzinfo=None)
     cleaned = re.sub(r"\b(\d{1,2})(?:st|nd|rd|th)\b", r"\1", date_text)
@@ -304,7 +305,7 @@ def _flight(text: str, base) -> dict:
         origin, dest = pair.group(1), pair.group(2)
     if coded:
         pass
-    elif origin:
+    elif origin and dest:
         out["route"] = f"{AIRPORTS[origin]} ({origin}) → {AIRPORTS[dest]} ({dest})"
     else:
         cities = "|".join(sorted(set(AIRPORTS.values()), key=len, reverse=True))
