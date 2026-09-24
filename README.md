@@ -81,6 +81,16 @@ device live), accent colour, text size, animations, default timeframe, and switc
 and widget (10 numbers and 6 widgets to choose from). The calendar picks Day / Week / Month from the screen size,
 and the toolbar overrides it for the current visit.
 
+### Layouts by screen size
+The UI is arranged differently for each kind of screen (`static/css/adaptive.css`; `<html data-ui>` records which):
+
+| Screen | Navigation | Dashboard |
+|---|---|---|
+| Phone (< 640px) | floating bottom tab bar | swipeable KPI and chart carousels, timeframe chips, dialogs as bottom sheets |
+| Tablet (640-1023px) | slim icon rail | 3-up KPI grid, stacked cards |
+| Laptop (1024-1535px) | sidebar + top tabs | two columns (numbers/charts, up next) |
+| Desktop (>= 1536px) | sidebar + top tabs | three regions, six KPIs in a row |
+
 ### Google OAuth setup
 Create an OAuth client in Google Cloud Console (APIs & Services → Credentials), enable the Gmail API, and either
 put the downloaded JSON at `./credentials.json` or set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. For a web

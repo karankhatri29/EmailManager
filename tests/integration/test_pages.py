@@ -52,3 +52,24 @@ def test_dashboard_has_its_kpi_widgets_and_a_settings_section_to_choose_them(cli
         assert element in html, element
     assert client.get("/static/js/kpis.js").status_code == 200
     assert client.get("/static/js/dashboard-catalog.js").status_code == 200
+
+
+def test_each_screen_size_gets_its_own_navigation(client):
+    """Phone: bottom tab bar. Tablet: icon rail. Laptop and up: sidebar + top tabs (see css/adaptive.css)."""
+    html = client.get("/").text
+    assert 'id="bottomNav"' in html and 'id="rail"' in html
+    # the same actions are reachable from both, and the timeframe chips exist for sizes without the sidebar select
+    for control in (
+        'data-nav="dashboard"',
+        'data-nav="activity"',
+        'data-action="sync"',
+        'data-action="menu"',
+        'id="timeChips"',
+    ):
+        assert html.count(control) >= 1, control
+    assert html.count('data-nav="activity"') == 2  # bottom bar + rail
+    assert "dataset.ui" in html  # the active layout class is recorded on <html> before first paint
+    css = client.get("/static/css/adaptive.css")
+    assert css.status_code == 200
+    for layout in ("phone", "tablet", "laptop", "desktop"):
+        assert layout in css.text
