@@ -82,7 +82,7 @@ def test_nested_parts_and_html_fallback():
     assert fetch_message(_service(nested), "1")["body"] == "deep text"
 
     html_only = {"payload": {"parts": [{"mimeType": "text/html", "body": {"data": _b64("<p>x</p>")}}]}}
-    assert fetch_message(_service(html_only), "1")["body"] == "<p>x</p>"
+    assert fetch_message(_service(html_only), "1")["body"] == "x"
 
 
 def test_single_part_body():

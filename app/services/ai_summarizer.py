@@ -1,31 +1,49 @@
 import html
 import json
 import logging
-import re
 
 from google import genai
 from google.genai import types
 
 from ..core.config import get_settings
+from .textify import strip_symbols
 
 logger = logging.getLogger(__name__)
 
 SUMMARY_PROMPT = """Extract email insights into this exact Markdown layout.
-Omit any section lacking explicit data. Do NOT write any introduction or greetings.
+Omit any section lacking explicit data. Do NOT write any introduction or greetings. Do not use emoji.
 
-### 📝 Core Ask
+### Core Ask
 [2-3 sentences on what sender needs + deadlines if any]
 
-### 👤 Sender
+### Sender
 [Sender name/org + purpose]
 
-### 📌 Important Facts
+### Important Facts
 - [Key names, system/tracking IDs, or key figures]
 
-### ⚡ Tasks & Deadlines
+### Tasks & Deadlines
 - [Actionable task] -> [Deadline or 'Immediate Action Required']
 
 Email Text:
+{text}"""
+
+THREAD_PROMPT = """Summarise this email conversation for someone who has not read it. Be brief and concrete.
+Use exactly this Markdown layout, omit any section with nothing to say, and write no introduction. Do not use emoji.
+
+### Conversation
+[1-2 sentences: what the thread is about]
+
+### Decisions
+- [each decision or agreement reached]
+
+### Open Questions
+- [each unanswered question or unresolved point]
+
+### Next Steps
+- [who needs to do what, with dates if any]
+
+Messages, oldest first:
 {text}"""
 
 
@@ -49,27 +67,8 @@ def generate_json(prompt, schema):
 
 
 def generate_text(prompt):
-    """Plain-text generation. Raises if the call fails."""
-    return (_generate(prompt) or "").strip()
-
-
-THREAD_PROMPT = """Summarise this email conversation for someone who has not read it. Be brief and concrete.
-Use exactly this Markdown layout, omit any section with nothing to say, and write no introduction:
-
-### 🧵 Conversation
-[1-2 sentences: what the thread is about]
-
-### ✅ Decisions
-- [each decision or agreement reached]
-
-### ❓ Open Questions
-- [each unanswered question or unresolved point]
-
-### ➡️ Next Steps
-- [who needs to do what, with dates if any]
-
-Messages, oldest first:
-{text}"""
+    """Plain-text generation, without emoji. Raises if the call fails."""
+    return strip_symbols(_generate(prompt) or "")
 
 
 def summarize_thread(text):
@@ -86,63 +85,46 @@ def summarize_email(text):
         return None
 
 
-def clean_summary_text(raw_text):
-    """Parses raw AI blocks, removes ### markers, and injects clean layout breaks.
+# Section title -> (label shown, colour). Anything else gets a neutral heading.
+_SECTIONS = {
+    "core ask": ("Core Ask", "blue"),
+    "sender": ("Sender & Context", "purple"),
+    "important facts": ("Important Facts", "emerald"),
+    "tasks & deadlines": ("Action Tasks & Deadlines", "red"),
+    "tasks": ("Action Tasks & Deadlines", "red"),
+}
+_HEADING = "text-{colour}-400 font-bold border-b border-{colour}-500/20 pb-1 mb-2 text-xs uppercase tracking-wider mt-4"
 
-    Model output is HTML-escaped before it is embedded in markup.
+
+def clean_summary_text(raw_text):
+    """Turns the model's Markdown into small HTML blocks: section headings, bullets and paragraphs.
+
+    The model's output is stripped of emoji and HTML-escaped before it is embedded in markup.
     """
-    if not raw_text:
+    text = strip_symbols(raw_text)
+    if not text:
         return ""
 
-    text = raw_text.strip()
+    lines = text.split("\n")
+    if lines and lines[0].strip().lower().startswith("here"):
+        lines = lines[1:]  # a chatty preamble
 
-    if text.lower().startswith("here"):
-        text = "\n".join(text.split("\n")[1:]).strip()
-
-    # Inject padding around raw markdown lines if compressed
-    text = re.sub(r"([^\n])###", r"\1\n\n###", text)
-
-    text = re.sub(r"### 📝\s*Core Ask\s*", "### 📝 Core Ask\n", text)
-    text = re.sub(r"### 👤\s*Sender\s*", "### 👤 Sender\n", text)
-    text = re.sub(r"### 📌\s*Important Facts\s*", "### 📌 Important Facts\n", text)
-    text = re.sub(r"### ⚡\s*(Tasks & Deadlines|Tasks)\s*", "### ⚡ Tasks & Deadlines\n", text)
-
-    processed_blocks = []
-
-    for line in text.split("\n"):
+    blocks = []
+    for line in "\n".join(lines).replace("###", "\n###").split("\n"):
         stripped = line.strip()
         if not stripped:
             continue
 
-        if stripped.startswith("### 📝 Core Ask"):
-            processed_blocks.append(
-                "<div class='text-blue-400 font-bold border-b border-blue-500/20 pb-1 mb-2 text-xs uppercase tracking-wider mt-1'>📝 Core Ask</div>"
-            )
-        elif stripped.startswith("### 👤 Sender"):
-            processed_blocks.append(
-                "<div class='text-purple-400 font-bold border-b border-purple-500/20 pb-1 mb-2 text-xs uppercase tracking-wider mt-4'>👤 Sender & Context</div>"
-            )
-        elif stripped.startswith("### 📌 Important Facts"):
-            processed_blocks.append(
-                "<div class='text-emerald-400 font-bold border-b border-emerald-500/20 pb-1 mb-2 text-xs uppercase tracking-wider mt-4'>📌 Important Facts</div>"
-            )
-        elif stripped.startswith("### ⚡ Tasks & Deadlines"):
-            processed_blocks.append(
-                "<div class='text-red-400 font-bold border-b border-red-500/20 pb-1 mb-2 text-xs uppercase tracking-wider mt-4'>⚡ Action Tasks & Deadlines</div>"
-            )
-        elif stripped.startswith("### "):
-            title = html.escape(stripped.removeprefix("### ").strip())
-            processed_blocks.append(
-                f"<div class='text-slate-300 font-bold border-b border-slate-500/20 pb-1 mb-2 text-xs uppercase tracking-wider mt-4'>{title}</div>"
-            )
-        elif stripped.startswith("-") or stripped.startswith("*"):
-            clean_item = html.escape(stripped.lstrip("-* ").strip())
-            processed_blocks.append(
-                f"<div class='pl-2 text-slate-300 text-sm my-1 flex items-start gap-2'><span>•</span><span>{clean_item}</span></div>"
+        if stripped.startswith("###"):
+            title = stripped.lstrip("#").strip()
+            label, colour = _SECTIONS.get(title.lower(), (title, "slate"))
+            blocks.append(f"<div class='{_HEADING.format(colour=colour)}'>{html.escape(label)}</div>")
+        elif stripped.startswith(("-", "*")):
+            item = html.escape(stripped.lstrip("-* ").strip())
+            blocks.append(
+                f"<div class='pl-2 text-slate-300 text-sm my-1 flex items-start gap-2'><span>&bull;</span><span>{item}</span></div>"
             )
         else:
-            processed_blocks.append(
-                f"<p class='text-slate-200 text-sm leading-relaxed mb-2'>{html.escape(stripped)}</p>"
-            )
+            blocks.append(f"<p class='text-slate-200 text-sm leading-relaxed mb-2'>{html.escape(stripped)}</p>")
 
-    return "".join(processed_blocks)
+    return "".join(blocks)

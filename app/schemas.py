@@ -3,6 +3,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
+from .services.textify import normalize_body, strip_symbols
+
 
 def _as_utc(value: datetime | None) -> datetime | None:
     if value is not None and value.tzinfo is None:
@@ -74,6 +76,17 @@ class EmailOut(BaseModel):
     @classmethod
     def _utc(cls, value):
         return _as_utc(value)
+
+    @field_validator("body")
+    @classmethod
+    def _readable_body(cls, value):
+        """Mail stored before HTML was converted at sync time is still shown as text."""
+        return normalize_body(value)
+
+    @field_validator("summary")
+    @classmethod
+    def _plain_summary(cls, value):
+        return strip_symbols(value) if value else value
 
 
 class EmailListItem(BaseModel):
@@ -298,6 +311,11 @@ class ThreadOut(BaseModel):
     messages: list[ThreadMessage]
     summary: str | None = None  # HTML built server-side from escaped text
     summary_current: bool = False  # False if the thread has grown since the summary was made
+
+    @field_validator("summary")
+    @classmethod
+    def _plain_summary(cls, value):
+        return strip_symbols(value) if value else value
 
 
 # --- settings, briefing, notifications, follow-ups ---------------------------------------------

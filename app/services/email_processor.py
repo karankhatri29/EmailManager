@@ -4,6 +4,7 @@ from ..core.config import SUMMARIZED_CATEGORIES
 from . import rules as rules_service
 from .nlp_engine import category_score, classify
 from .senders import sender_address
+from .textify import normalize_body
 
 
 def classify_email(subject, body, address, rules=()):
@@ -25,7 +26,8 @@ def process_emails(raw_emails, rules=()):
 
     for email in raw_emails:
         address = sender_address(email["sender"])
-        score, category, reason, source = classify_email(email["subject"], email["body"], address, rules)
+        body = normalize_body(email["body"])  # HTML mail becomes readable text before anything reads it
+        score, category, reason, source = classify_email(email["subject"], body, address, rules)
         task = f"{email['subject'][:50]}..." if category in SUMMARIZED_CATEGORIES else None
 
         processed.append(
@@ -34,7 +36,7 @@ def process_emails(raw_emails, rules=()):
                 "sender": email["sender"],
                 "sender_address": address,
                 "subject": email["subject"],
-                "body": email["body"],
+                "body": body,
                 "date": email.get("date") or datetime.now(timezone.utc),
                 "thread_id": email.get("thread_id"),
                 "unsubscribe_url": email.get("unsubscribe_url"),

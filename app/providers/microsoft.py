@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import requests
 
 from ..core.config import MICROSOFT_SCOPES, TIMEFRAME_MESSAGE_LIMITS, TIMEFRAMES, get_settings
+from ..services.textify import normalize_body
 from .base import ProviderAuthError
 from .common import parse_list_unsubscribe
 from .microsoft_oauth import credentials_from_token, token_endpoint
@@ -133,7 +134,7 @@ class MicrosoftProvider:
             "id": message_id,
             "sender": _format_sender(message),
             "subject": message.get("subject") or "No Subject",
-            "body": body[:MAX_BODY_CHARS],
+            "body": normalize_body(body, MAX_BODY_CHARS),
             "date": _parse_date(message.get("receivedDateTime")),
         }
         if message.get("conversationId"):

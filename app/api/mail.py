@@ -31,6 +31,7 @@ from ..schemas import (
 from ..services import email_actions, search_service, threads
 from ..services.nlp_engine import PROMOTIONAL
 from ..services.rules import match, to_specs
+from ..services.textify import normalize_body
 from ..services.unsubscribe import UnsafeUrl, one_click_unsubscribe
 from .deps import current_user
 
@@ -60,7 +61,7 @@ def to_list_item(email: Email) -> EmailListItem:
         sender=email.sender,
         sender_address=email.sender_address,
         subject=email.subject,
-        snippet=" ".join(email.body.split())[:160],
+        snippet=" ".join(normalize_body(email.body).split())[:160],
         date=email.date,
         score=email.score,
         category=email.category,
@@ -271,7 +272,9 @@ def _thread_out(db: Session, user: User, email: Email) -> ThreadOut:
     return ThreadOut(
         message_count=len(messages),
         messages=[
-            ThreadMessage(id=m.id, sender=m.sender, date=m.date, snippet=" ".join(m.body.split())[:160])
+            ThreadMessage(
+                id=m.id, sender=m.sender, date=m.date, snippet=" ".join(normalize_body(m.body).split())[:160]
+            )
             for m in messages
         ],
         summary=cached.summary if cached else None,

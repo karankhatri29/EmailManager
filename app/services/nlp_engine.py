@@ -14,7 +14,7 @@ except OSError:
 
 
 # =============================================================
-# 📁 PROJECT / COURSE CONTEXT EXTRACTOR
+# PROJECT / COURSE CONTEXT EXTRACTOR
 # =============================================================
 def extract_project_context(subject, text_raw):
     """
@@ -56,7 +56,7 @@ def extract_project_context(subject, text_raw):
 
 
 # =============================================================
-# 🛠️ ADVANCED TASK GRAMMATICAL OBJECT MINER
+# ADVANCED TASK GRAMMATICAL OBJECT MINER
 # =============================================================
 def extract_action_task(subject, doc, text_raw):
     """
@@ -92,7 +92,7 @@ def extract_action_task(subject, doc, text_raw):
 
 
 # =============================================================
-# ⏱️ ROBUST CALENDAR DATE & TIMELINE TRACKER
+# ROBUST CALENDAR DATE & TIMELINE TRACKER
 # =============================================================
 def extract_explicit_deadline(text_raw, entities):
     """
@@ -148,7 +148,7 @@ def extract_explicit_deadline(text_raw, entities):
 
 
 # =============================================================
-# ⚙️ CORE NLP PROCESSING PIPELINE
+# CORE NLP PROCESSING PIPELINE
 # =============================================================
 def process_text(raw_text):
     """
@@ -185,7 +185,7 @@ def process_text(raw_text):
 
 
 # =============================================================
-# ⚡ SEMANTIC PRIORITY CLASSIFIER (With Informational Guards)
+# SEMANTIC PRIORITY CLASSIFIER (With Informational Guards)
 # =============================================================
 URGENT = "Urgent / Action Required"
 IMPORTANT = "Important"

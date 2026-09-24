@@ -8,6 +8,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from ..core.config import GMAIL_SCOPES, TIMEFRAME_MESSAGE_LIMITS, TIMEFRAMES
+from ..services.textify import normalize_body
 from .base import ProviderAuthError
 from .common import parse_list_unsubscribe
 
@@ -106,7 +107,7 @@ def _parse_message(msg_detail, message_id):
         "id": message_id,
         "sender": sender,
         "subject": subject,
-        "body": body[:MAX_BODY_CHARS],
+        "body": normalize_body(body, MAX_BODY_CHARS),
         "date": _parse_date(msg_detail),
         "thread_id": msg_detail.get("threadId"),
         "unsubscribe_url": unsubscribe_url,
