@@ -15,11 +15,17 @@ def enable_sqlite_foreign_keys(engine: Engine) -> None:
         # Overwrite deleted / replaced content with zeros. Without this SQLite leaves the old bytes in the file, so
         # "disconnect a mailbox" (and re-encrypting old mail) would not really remove the readable text.
         dbapi_connection.execute("PRAGMA secure_delete=ON")
+        # Syncs, the ticket scan and web requests write at the same time: a writer that meets another one waits
+        # (up to 30 s) instead of failing with "database is locked". (Not WAL mode: it would keep deleted mail
+        # readable in the -wal file, which secure_delete above is there to prevent.)
+        dbapi_connection.execute("PRAGMA busy_timeout=30000")
 
 
 _url = get_settings().database_url
 _engine_kwargs = (
-    {"connect_args": {"check_same_thread": False}} if _url.startswith("sqlite") else {"pool_pre_ping": True}
+    {"connect_args": {"check_same_thread": False, "timeout": 30}}
+    if _url.startswith("sqlite")
+    else {"pool_pre_ping": True}
 )
 
 engine = create_engine(_url, **_engine_kwargs)
