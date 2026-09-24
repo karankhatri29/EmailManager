@@ -44,9 +44,9 @@ def test_dashboard_has_its_kpi_widgets_and_a_settings_section_to_choose_them(cli
     for element in (
         'id="kpiGrid"',
         'id="card-focus"',
+        'id="card-inbox"',
         'id="card-senders"',
         'id="card-mailboxes"',
-        'id="card-busyHours"',
         'id="dashPrefs"',
     ):
         assert element in html, element
@@ -73,3 +73,19 @@ def test_each_screen_size_gets_its_own_navigation(client):
     assert css.status_code == 200
     for layout in ("phone", "tablet", "laptop", "desktop"):
         assert layout in css.text
+
+
+def test_inbox_explorer_replaces_the_charts(client):
+    """The donut and line chart are gone: an interactive explorer (chips, timeline bars, search, list) took over."""
+    html = client.get("/").text
+    for element in (
+        'id="priorityChips"',
+        'id="timelineBars"',
+        'id="inboxSearch"',
+        'id="inboxList"',
+        'data-sort="smart"',
+    ):
+        assert element in html, element
+    for gone in ("pieChart", "lineChart", "plotly"):
+        assert gone not in html, gone  # no chart library is loaded any more
+    assert client.get("/static/js/explorer.js").status_code == 200

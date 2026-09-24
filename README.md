@@ -72,13 +72,18 @@ The periodic sync runs inside the API process by default. Then: create an accoun
 
 ### Dashboard and settings
 The home screen leads with a "Do this first" card, then key numbers (needs action, overdue, due today, next 7 days,
-on-time completion, emails received), priority and volume charts, top senders and a per-mailbox breakdown. Numbers
-are colour-coded by threshold (red overdue, orange due today, blue upcoming, green fine). Everything is computed in
+on-time completion, emails received), the **Inbox explorer**, top senders and a per-mailbox breakdown. Numbers are
+colour-coded by threshold (red overdue, orange due today, blue upcoming, green fine). Everything is computed in
 the browser from data the app already stores.
+
+The **Inbox explorer** is one interactive card: priority chips with live counts (and a mix bar that is a control
+too), a clickable stacked-bar timeline (hours for 24h, days for 7 / 30 days), search, a Smart / Newest sort and the
+email list. Every control narrows the same list and the others update to match. Tapping a sender in *Top senders*
+or the *Needs action* number drills into it, and any email can become a task with the **+ Task** button.
 
 **Settings** (gear icon, saved per device in the browser): theme (System / Light / Dark; System follows the
 device live), accent colour, text size, animations, default timeframe, and switches for every dashboard number
-and widget (10 numbers and 6 widgets to choose from). The calendar picks Day / Week / Month from the screen size,
+and widget (10 numbers and 4 widgets to choose from). The calendar picks Day / Week / Month from the screen size,
 and the toolbar overrides it for the current visit.
 
 ### Layouts by screen size
@@ -86,10 +91,10 @@ The UI is arranged differently for each kind of screen (`static/css/adaptive.css
 
 | Screen | Navigation | Dashboard |
 |---|---|---|
-| Phone (< 640px) | floating bottom tab bar | swipeable KPI and chart carousels, timeframe chips, dialogs as bottom sheets |
+| Phone (< 640px) | floating bottom tab bar | swipeable KPI carousel, timeframe chips, dialogs as bottom sheets |
 | Tablet (640-1023px) | slim icon rail | 3-up KPI grid, stacked cards |
 | Laptop (1024-1535px) | sidebar + top tabs | two columns (numbers/charts, up next) |
-| Desktop (>= 1536px) | sidebar + top tabs | three regions, six KPIs in a row |
+| Desktop (>= 1536px) | sidebar + top tabs | wide main area with six KPIs in a row, up next on the right |
 
 ### Google OAuth setup
 Create an OAuth client in Google Cloud Console (APIs & Services → Credentials), enable the Gmail API, and either

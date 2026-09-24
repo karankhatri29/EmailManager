@@ -1,7 +1,7 @@
 /* ==========================================================================================================
    Adaptive layout: a different arrangement for each kind of screen, not one layout squeezed to fit.
 
-     phone    < 640px      bottom tab bar, swipeable KPI / chart carousels, dialogs as bottom sheets
+     phone    < 640px      bottom tab bar, swipeable KPI carousel, dialogs as bottom sheets
      tablet   640-1023px   slim icon rail on the left, 3-up KPIs, drawer for mailboxes
      laptop   1024-1535px  full sidebar + top tabs, two-column dashboard with a scrolling main area
      desktop  >= 1536px    three-region dashboard grid, six KPIs in a row
@@ -49,19 +49,18 @@
     /* Keep content clear of the floating bar. */
     #view-dashboard, #view-activity { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
 
-    /* KPI tiles and charts become swipeable carousels instead of tall stacks. */
-    #kpiGrid, #chartRow {
+    /* KPI tiles become a swipeable carousel instead of a tall stack. */
+    #kpiGrid {
         display: flex; flex-direction: row;
         overflow-x: auto; overscroll-behavior-x: contain;
         scroll-snap-type: x mandatory;
         margin-inline: -0.75rem; padding-inline: 0.75rem; padding-bottom: 0.25rem;
         scrollbar-width: none;
     }
-    #kpiGrid::-webkit-scrollbar, #chartRow::-webkit-scrollbar { display: none; }
+    #kpiGrid::-webkit-scrollbar { display: none; }
     #kpiGrid { gap: 0.6rem; }
     #kpiGrid > * { flex: 0 0 44vw; scroll-snap-align: start; }
-    #chartRow { gap: 0.75rem; }
-    #chartRow > * { flex: 0 0 88vw; scroll-snap-align: center; }
+    #inboxList { max-height: 24rem; }
 
     /* Dialogs slide up from the bottom as sheets, with a grab handle. */
     #activityModal, #feedModal, #settingsModal { align-items: flex-end; padding: 0; }
@@ -100,7 +99,7 @@
 
 /* ---- Wide desktop -------------------------------------------------------------------------------------------- */
 @media (min-width: 1536px) {
-    /* Three regions: numbers + charts | insights | up next. */
+    /* Three regions: numbers + inbox explorer | insights | up next. */
     #dashMain {
         width: 68%;
         display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -109,9 +108,8 @@
     #dashMain > #hero, #dashMain > #connectPrompt, #dashMain > #accountFilter,
     #dashMain > #card-focus, #dashMain > #kpiGrid { grid-column: 1 / -1; }
     #kpiGrid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-    #chartRow { grid-column: 1; grid-row: span 2; flex-direction: column; }
-    #insightRow { grid-column: 2; grid-template-columns: minmax(0, 1fr); }
-    #card-busyHours { grid-column: 2; }
+    #card-inbox { grid-column: 1 / -1; }
+    #insightRow { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #upNext { width: 32%; }
     .stat-num { font-size: 2.2rem; }
 }

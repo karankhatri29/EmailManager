@@ -28,7 +28,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="{{ url_for('static', path='js/tailwind-config.js') }}"></script>
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', path='css/theme.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='css/adaptive.css') }}">
     <style>
@@ -69,7 +68,7 @@
 </head>
 <body class="h-screen w-full overflow-hidden">
 
-    <div id="toasts" class="fixed top-4 right-4 left-4 sm:left-auto z-[100] space-y-2 flex flex-col items-end pointer-events-none [&>*]:pointer-events-auto"></div>
+    <div id="toasts" class="fixed top-[4.5rem] right-4 left-4 sm:left-auto z-[100] space-y-2 flex flex-col items-end pointer-events-none [&>*]:pointer-events-auto"></div>
 
     <!-- ============ Sign in / create account ============ -->
     <section id="authScreen" class="hidden h-full w-full items-center justify-center p-4 sm:p-6 overflow-y-auto">
@@ -227,15 +226,36 @@
 
                     <div id="kpiGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3"></div>
 
-                    <div id="chartRow" class="flex flex-col md:flex-row gap-4 xl:gap-6">
-                        <div id="card-priorityMix" class="glass-card p-4 flex-1 flex flex-col relative min-h-[260px]">
-                            <p class="text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2">Priority mix</p>
-                            <div class="relative flex-1 w-full"><div id="pieChart" class="absolute inset-0"></div></div>
+                    <div id="card-inbox" class="glass-card p-4 sm:p-5 flex flex-col gap-4 min-w-0">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h3 class="text-sm font-extrabold text-fg tracking-tight">Inbox explorer</h3>
+                                <p id="inboxCount" class="text-xs text-slate-400 mt-0.5" aria-live="polite"></p>
+                            </div>
+                            <input id="inboxSearch" type="search" placeholder="Search mail" aria-label="Search mail" autocomplete="off" class="field sm:max-w-[16rem]">
                         </div>
-                        <div id="card-volume" class="glass-card p-4 flex-1 flex flex-col relative min-h-[260px]">
-                            <p class="text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2">Volume timeline</p>
-                            <div class="relative flex-1 w-full"><div id="lineChart" class="absolute inset-0"></div></div>
+
+                        <div>
+                            <div id="priorityChips" class="flex flex-wrap gap-2" role="group" aria-label="Filter by priority"></div>
+                            <div id="mixBar" class="h-2 rounded-full overflow-hidden flex gap-px bg-slate-700/40 mt-3" aria-hidden="true"></div>
                         </div>
+
+                        <div>
+                            <div id="timelineBars" class="tl" role="group" aria-label="Mail over time. Select a bar to filter the list."></div>
+                            <div id="timelineAxis" class="tl-axis" aria-hidden="true"></div>
+                            <p id="timelineCaption" class="text-xs text-slate-400 mt-2 min-h-[1rem]" aria-live="polite"></p>
+                        </div>
+
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div id="inboxFilters" class="hidden flex-wrap items-center gap-2"></div>
+                            <div class="seg ml-auto" role="group" aria-label="Sort">
+                                <button type="button" data-sort="smart" aria-pressed="true">Smart</button>
+                                <button type="button" data-sort="newest" aria-pressed="false">Newest</button>
+                            </div>
+                        </div>
+
+                        <div id="inboxList" class="max-h-[28rem] overflow-y-auto -mx-1 px-1 space-y-1.5"></div>
+                        <button type="button" id="inboxMore" class="hidden self-center text-xs font-bold text-blue-400 hover:text-blue-300 cursor-pointer py-1"></button>
                     </div>
 
                     <div id="insightRow" class="grid grid-cols-1 md:grid-cols-2 gap-4 xl:gap-6">
@@ -249,10 +269,6 @@
                         </div>
                     </div>
 
-                    <div id="card-busyHours" class="glass-card p-4 hidden flex-col min-h-[240px]">
-                        <p class="text-[0.7rem] font-bold text-slate-400 uppercase tracking-wider mb-2">Busiest hours</p>
-                        <div class="relative flex-1 w-full min-h-[180px]"><div id="busyChart" class="absolute inset-0"></div></div>
-                    </div>
                 </div>
 
                 <div id="upNext" class="w-full xl:w-2/5 glass-card flex flex-col min-w-0 h-[28rem] xl:h-auto shrink-0 xl:shrink xl:min-h-0">

@@ -48,7 +48,11 @@ function load() {
         // dashboard switches: keep only ids that still exist, in catalog order
         const keep = (catalog, ids) => catalog.filter((item) => ids.includes(item.id)).map((item) => item.id);
         if (Array.isArray(saved.kpis)) prefs.kpis = keep(KPI_CATALOG, saved.kpis);
-        if (Array.isArray(saved.widgets)) prefs.widgets = keep(WIDGET_CATALOG, saved.widgets);
+        if (Array.isArray(saved.widgets)) {
+            // The donut and line charts became the Inbox explorer: carry the choice over.
+            const old = saved.widgets.filter((id) => id === 'priorityMix' || id === 'volume');
+            prefs.widgets = keep(WIDGET_CATALOG, old.length ? [...saved.widgets, 'inbox'] : saved.widgets);
+        }
     } catch {
         // storage blocked or corrupted: fall back to the defaults
     }

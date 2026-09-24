@@ -5,6 +5,7 @@ import { initAccounts, loadAccounts, renderAccountFilter } from './accounts.js';
 import { setUnauthorizedHandler, api } from './api.js';
 import { initAuth, logout } from './auth.js';
 import { initDashboard, loadEmails, openEmailDrawer, renderCharts } from './dashboard.js';
+import { initExplorer } from './explorer.js';
 import { initKpis } from './kpis.js';
 import { getPrefs, initSettings } from './settings.js';
 import { state } from './state.js';
@@ -184,6 +185,8 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     initDashboard();
     initActivity();
+    initExplorer({ openEmail: openEmailDrawer });
+    document.addEventListener('taskschanged', () => loadActivities()); // a task added from the inbox shows in the calendar
     initKpis({
         openEmail: openEmailDrawer,
         goActivity: () => switchTab('activity'),

@@ -1,8 +1,8 @@
 import { api } from './api.js';
-import { CATEGORY_COLORS, state } from './state.js';
+import { state } from './state.js';
 import { providerLabel } from './accounts.js';
+import { renderExplorer } from './explorer.js';
 import { loadDashActivities, renderAll, widgetOn } from './kpis.js';
-import { cssVar } from './settings.js';
 import { $, esc, senderName } from './util.js';
 
 const URGENT = 'Urgent / Action Required';
@@ -66,7 +66,6 @@ export async function renderDashboard() {
 function renderHome() {
     const m = renderAll();
     renderHero(m);
-    renderCharts();
 }
 
 // Groups follow how the scheduler ranks tasks: a dated deadline, something soon, or no deadline at all.
@@ -135,70 +134,9 @@ async function renderTasks() {
     }).join('');
 }
 
+// Kept for callers that re-lay-out the home screen (resize, sidebar, theme): redraws the Inbox explorer.
 export function renderCharts() {
-    if (!state.emails.length || $('view-dashboard').classList.contains('hidden') || !window.Plotly) return;
-
-    const layoutBase = {
-        paper_bgcolor: 'rgba(0,0,0,0)',
-        plot_bgcolor: 'rgba(0,0,0,0)',
-        font: { color: cssVar('--chart-text'), family: 'Plus Jakarta Sans, Inter, sans-serif' },
-        margin: { t: 20, b: 30, l: 40, r: 15 },
-        showlegend: false,
-    };
-
-    // Pie: priority distribution
-    const counts = {};
-    state.emails.forEach((e) => { counts[e.category] = (counts[e.category] || 0) + 1; });
-    if (widgetOn('priorityMix')) Plotly.newPlot('pieChart', [{
-        values: Object.values(counts),
-        labels: Object.keys(counts),
-        type: 'pie',
-        hole: 0.66,
-        sort: false,
-        marker: {
-            colors: Object.keys(counts).map((c) => CATEGORY_COLORS[c] || '#888'),
-            line: { color: cssVar('--chart-ring'), width: 3 }, // gaps between slices match the card
-        },
-        textinfo: 'percent',
-        textposition: 'inside',
-    }], { ...layoutBase, margin: { t: 0, b: 20, l: 30, r: 10 } }, { displayModeBar: false, responsive: true });
-
-    // Timeline: hourly for one day, daily otherwise
-    const hourly = state.timeframe === 'Last 1 Day';
-    const categories = Object.keys(CATEGORY_COLORS);
-    const buckets = {};
-    state.emails.forEach((email) => {
-        const d = new Date(email.date);
-        const key = hourly
-            ? `${String(d.getHours()).padStart(2, '0')}:00`
-            : d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
-        buckets[key] = buckets[key] || Object.fromEntries(categories.map((c) => [c, 0]));
-        buckets[key][email.category] += 1;
-    });
-    const keys = Object.keys(buckets).sort((a, b) => (hourly ? a.localeCompare(b) : new Date(a) - new Date(b)));
-
-    const traces = categories.map((cat) => ({
-        x: keys,
-        y: keys.map((k) => buckets[k][cat]),
-        type: 'scatter',
-        mode: 'lines+markers',
-        name: cat,
-        line: { color: CATEGORY_COLORS[cat], width: 3, shape: 'spline' },
-        marker: { size: 6 },
-        hovertemplate: `<b>${cat}</b><br>%{x}<br>Count: %{y}<extra></extra>`,
-    }));
-
-    // Show only as many x labels as fit (about 56px each) so they never collide on narrow screens.
-    const fits = Math.max(2, Math.floor($('lineChart').clientWidth / 56));
-    const step = Math.ceil(keys.length / fits);
-
-    if (widgetOn('volume')) Plotly.newPlot('lineChart', traces, {
-        ...layoutBase,
-        margin: { t: 20, b: 40, l: 36, r: 12 },
-        xaxis: { showgrid: false, tickmode: 'array', tickvals: keys.filter((_, i) => i % step === 0), tickangle: 0 },
-        yaxis: { showgrid: true, gridcolor: cssVar('--chart-grid'), zeroline: false },
-        hovermode: 'closest',
-    }, { displayModeBar: false, responsive: true });
+    if (widgetOn('inbox')) renderExplorer();
 }
 
 // --- email drawer (read one email: summary + original) ------------------------------------------
@@ -255,7 +193,5 @@ export function initDashboard() {
     $('drawerClose').addEventListener('click', closeEmailDrawer);
     $('drawerBackdrop').addEventListener('click', closeEmailDrawer);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeEmailDrawer(); });
-    window.addEventListener('resize', renderCharts);
-    document.addEventListener('themechange', renderCharts); // new theme, new chart colours
     document.addEventListener('dashchange', renderHome); // Settings switched a number or widget on/off
 }
