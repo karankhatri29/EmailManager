@@ -26,6 +26,7 @@ const view = { kind: null, scope: 'upcoming' };
 let hooks = { openEmail() {}, goTrips() {} };
 let pollTimer = null;
 const added = new Set(); // bookings already put on the Activity calendar this visit
+const expanded = new Set(); // rows the user opened; kept across re-renders
 
 // --- dates ---------------------------------------------------------------------------------------
 
@@ -168,20 +169,21 @@ function card(b) {
     const rel = b.status === 'cancelled' ? { text: 'Cancelled', tone: 'urgent' } : b.status === 'changed' ? { text: 'Changed', tone: 'warn' } : relative(b);
     const details = b.details.map((d) => `<div class="min-w-0"><dt class="ticket-k">${esc(d.label)}</dt><dd class="ticket-v">${esc(d.value)}</dd></div>`).join('');
     const canCalendar = Boolean(b.start_at);
+    const open = expanded.has(b.email_id);
+    // One slim row shows only what the trip is and when. Everything else (provider, booking reference, passenger
+    // and seat details, actions) stays hidden until the row is expanded.
     return `
     <article class="ticket tone-${meta.tone} ${b.status === 'cancelled' ? 'ticket-cancelled' : ''}" data-booking="${esc(b.email_id)}">
-        <div class="ticket-stub">${icon(meta.paths, 'w-7 h-7')}<span>${meta.one}</span></div>
-        <div class="ticket-perf" aria-hidden="true"></div>
-        <div class="ticket-body">
-            <div class="flex items-start justify-between gap-2">
-                <div class="min-w-0">
-                    <p class="ticket-provider">${esc(b.provider)}</p>
-                    <h3 class="ticket-title">${esc(b.title)}</h3>
-                    ${b.subtitle ? `<p class="text-xs text-slate-400 mt-0.5 break-words">${esc(b.subtitle)}</p>` : ''}
-                </div>
-                ${rel ? `<span class="chip tone-${rel.tone} shrink-0">${esc(rel.text)}</span>` : ''}
-            </div>
-            <p class="ticket-when">${esc(whenText(b))}</p>
+        <button type="button" data-toggle aria-expanded="${open}" class="ticket-row">
+            <span class="ticket-ico">${icon(meta.paths, 'w-4 h-4')}</span>
+            <span class="ticket-title">${esc(b.title)}</span>
+            <span class="ticket-when">${esc(whenText(b))}</span>
+            ${rel ? `<span class="chip tone-${rel.tone} ticket-rel">${esc(rel.text)}</span>` : ''}
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="ticket-chev w-4 h-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+        </button>
+        <div class="ticket-more" ${open ? '' : 'hidden'}>
+            <p class="ticket-provider">${meta.one} · ${esc(b.provider)}</p>
+            ${b.subtitle ? `<p class="text-xs text-slate-400 mt-0.5 break-words">${esc(b.subtitle)}</p>` : ''}
             ${details ? `<dl class="ticket-details">${details}</dl>` : ''}
             <div class="flex flex-wrap items-center gap-2 mt-3">
                 ${detailChips(b)}
@@ -324,6 +326,14 @@ export function initTrips(wiring = {}) {
         const copyBtn = event.target.closest('[data-copy]');
         if (copyBtn) return copy(copyBtn.dataset.copy);
         const cardEl = event.target.closest('[data-booking]');
+        if (cardEl && event.target.closest('[data-toggle]')) {
+            const id = cardEl.dataset.booking;
+            const open = !expanded.has(id);
+            if (open) expanded.add(id); else expanded.delete(id);
+            cardEl.querySelector('[data-toggle]').setAttribute('aria-expanded', String(open));
+            cardEl.querySelector('.ticket-more').hidden = !open;
+            return;
+        }
         const action = event.target.closest('[data-trip]');
         if (cardEl && action) {
             if (action.dataset.trip === 'open') openBookingEmail(cardEl.dataset.booking);

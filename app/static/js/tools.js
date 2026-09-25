@@ -57,10 +57,25 @@ const running = async (button, work) => {
 
 // --- briefing ------------------------------------------------------------------------------------
 
-const itemLine = (i) => `<li class="flex justify-between gap-3 py-1"><span class="truncate">${esc(i.title)}</span><span class="text-xs text-slate-400 shrink-0">${i.days_overdue ? `${i.days_overdue}d overdue` : esc(i.time || '')}</span></li>`;
+const itemLine = (i) => `<li class="flex justify-between gap-3 py-1.5"><span class="truncate">${esc(i.title)}</span><span class="text-xs text-slate-400 shrink-0">${i.days_overdue ? `${i.days_overdue}d overdue` : esc(i.time || '')}</span></li>`;
+
+// Each group gets its own colour so the heading band is clearly not one of the mail rows under it.
+const SECTION_TONES = {
+    'Overdue': 'text-red-500 bg-red-500/10 border-red-500',
+    'Classes today': 'text-teal-500 bg-teal-500/10 border-teal-500',
+    'Due today': 'text-amber-500 bg-amber-500/10 border-amber-500',
+    'Coming up': 'text-blue-500 bg-blue-500/10 border-blue-500',
+    'Needs you': 'text-violet-500 bg-violet-500/10 border-violet-500',
+    'Waiting for a reply': 'text-slate-400 bg-slate-500/10 border-slate-500',
+};
 
 function briefingSection(title, items, render = itemLine) {
-    return items.length ? `<div><p class="text-[0.68rem] font-bold uppercase tracking-wider text-slate-400 mb-1">${esc(title)}</p><ul class="text-sm text-fg divide-y divide-slate-700/40">${items.map(render).join('')}</ul></div>` : '';
+    if (!items.length) return '';
+    const tone = SECTION_TONES[title] || SECTION_TONES['Waiting for a reply'];
+    return `<section>
+        <h3 class="flex items-center justify-between gap-2 rounded-lg border-l-4 px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider ${tone}"><span>${esc(title)}</span><span class="rounded-full bg-slate-500/20 px-2 py-0.5 text-[0.7rem] leading-none text-fg">${items.length}</span></h3>
+        <ul class="mt-1 ml-3 pl-3 border-l border-slate-700/50 text-sm text-fg divide-y divide-slate-700/40">${items.map(render).join('')}</ul>
+    </section>`;
 }
 
 async function renderBriefing(body) {
@@ -74,7 +89,7 @@ async function renderBriefing(body) {
         briefingSection('Waiting for a reply', b.waiting, (w) => `<li class="flex justify-between gap-3 py-1"><span class="truncate">${esc(w.subject)}</span><span class="text-xs text-slate-400 shrink-0">${w.days}d, ${esc(senderName(w.recipient))}</span></li>`),
     ].filter(Boolean);
     body.innerHTML = `
-        <div class="${card} space-y-4">
+        <div class="${card} space-y-5">
             <div class="flex flex-wrap items-center justify-between gap-2">${heading(`${b.greeting}, here is ${b.date}`, `${b.counts.emails} emails in the last 24 hours, ${b.counts.urgent} need action`)}
                 <button type="button" class="${small}" data-send="briefing">${icon('mail')}Email me this</button></div>
             ${parts.length ? parts.join('') : empty('Nothing needs you today.')}
@@ -154,6 +169,7 @@ async function renderRules(body) {
                 <select name="category" class="field" aria-label="Category">${CATEGORIES.map((c) => `<option>${esc(c)}</option>`).join('')}</select>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg cursor-pointer">Add</button>
             </form>
+            <p id="ruleHelp" class="text-xs text-slate-400 mt-2" hidden>Search finds mail that <em>contains</em> your words, ignoring case, accents and punctuation. Words must all appear; <b>OR</b> or <b>|</b> means either; <b>-word</b> or <b>NOT word</b> excludes; <b>"exact phrase"</b>; <b>(brackets)</b> to group; <b>subject:</b>, <b>from:</b>, <b>body:</b> to search one place; <b>=word</b> for a whole word only; <b>pay*ment</b> as a wildcard. Write OR, AND and NOT in capitals.</p>
         </div>
         <div class="${card}">
             ${heading('Your rules', 'Removing a rule sends its mail back to the automatic classifier')}
@@ -161,6 +177,11 @@ async function renderRules(body) {
                 <li class="flex items-center gap-2 py-2"><p class="text-sm text-fg min-w-0 flex-1 truncate"><span class="text-slate-400">${KIND_LABEL[r.kind] || esc(r.kind)}</span> ${esc(r.pattern)} <span class="text-slate-400">is</span> ${esc(r.category)}</p>
                 <button type="button" class="${small}" data-rule-delete="${r.id}" aria-label="Remove rule">${icon('trash')}Remove</button></li>`).join('')}</ul>` : empty('No rules yet. Correct an email in its drawer and choose "Always, for this sender" to create one.')}
         </div>`;
+    const kindSelect = $('ruleForm').elements.kind;
+    kindSelect.addEventListener('change', () => {
+        $('ruleForm').elements.pattern.placeholder = PLACEHOLDER[kindSelect.value];
+        $('ruleHelp').hidden = kindSelect.value !== 'search';
+    });
     $('ruleForm').addEventListener('submit', async (event) => {
         event.preventDefault();
         const form = new FormData(event.target);
@@ -169,7 +190,6 @@ async function renderRules(body) {
             toast(`Rule added. ${made.affected} stored email${made.affected === 1 ? '' : 's'} changed.`, 'success');
             document.dispatchEvent(new CustomEvent('emailchanged'));
             render();
-            <p id="ruleHelp" class="text-xs text-slate-400 mt-2" hidden>Search finds mail that <em>contains</em> your words, ignoring case, accents and punctuation. Words must all appear; <b>OR</b> or <b>|</b> means either; <b>-word</b> or <b>NOT word</b> excludes; <b>"exact phrase"</b>; <b>(brackets)</b> to group; <b>subject:</b>, <b>from:</b>, <b>body:</b> to search one place; <b>=word</b> for a whole word only; <b>pay*ment</b> as a wildcard. Write OR, AND and NOT in capitals.</p>
         });
     });
 }
@@ -177,11 +197,6 @@ async function renderRules(body) {
 // --- events --------------------------------------------------------------------------------------
 
 async function onClick(event) {
-    const kindSelect = $('ruleForm').elements.kind;
-    kindSelect.addEventListener('change', () => {
-        $('ruleForm').elements.pattern.placeholder = PLACEHOLDER[kindSelect.value];
-        $('ruleHelp').hidden = kindSelect.value !== 'search';
-    });
     const t = event.target;
     const button = t.closest('button');
     const open = t.closest('[data-open]');

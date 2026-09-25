@@ -234,6 +234,24 @@ def label_value(text: str, labels: tuple[str, ...], max_len: int = 90) -> str | 
     return below.group(1).strip()[:max_len] if below else None
 
 
+def _place(text: str, labels: tuple[str, ...]) -> str | None:
+    """A station or city name for the first label that has one. Values that are really mail header lines
+    ('From: <a@b.com>', 'To: <c@d.com>') are skipped, so they never become the journey."""
+    lines = text.split("\n")
+    for label in labels:
+        pattern = re.compile(rf"(?i)^[\s>*\-•]*{label}\b[ \t]*[:\-–]?[ \t]*(\S.*?)?[ \t]*$")
+        for i, line in enumerate(lines):
+            m = pattern.match(line)
+            if not m:
+                continue
+            value = m.group(1) or (lines[i + 1].strip() if i + 1 < len(lines) else "")  # table layout: next line
+            if re.match(r"[\w .&/]{1,30}:", value):  # the "value" is really the next label ("To:", "Date:" ...)
+                continue
+            if value and not re.search(r"[@<>]", value) and len(value) <= 60:
+                return value
+    return None
+
+
 def _first(*values: str | None) -> str | None:
     return next((v for v in values if v), None)
 
@@ -315,8 +333,8 @@ def _flight(text: str, base) -> dict:
         if city_pair:
             out["route"] = f"{city_pair.group(1).title()} → {city_pair.group(2).title()}"
         else:
-            src = label_value(text, ("From", "Origin", "Departure City", "Departing from"))
-            dst = label_value(text, ("To", "Destination", "Arrival City", "Arriving at"))
+            src = _place(text, ("Origin", "Departure City", "Departing from", "From"))
+            dst = _place(text, ("Destination", "Arrival City", "Arriving at", "To"))
             if src and dst:
                 out["route"] = f"{_titlecase(src)} → {_titlecase(dst)}"
 
@@ -368,13 +386,15 @@ def _train(text: str, base) -> dict:
     if stations:
         out["route"] = f"{_titlecase(stations.group(1).strip())} → {_titlecase(stations.group(3).strip())}"
     else:
-        src = label_value(text, ("From", "Source", "Boarding Station", "Boarding At", "Boarding"))
-        dst = label_value(text, ("To", "Destination", "Reservation Upto", "Dest"))
+        src = _place(text, ("From", "Source", "Boarding Station", "Boarding At", "Boarding"))
+        dst = _place(text, ("Reservation Upto", "Destination", "Dest", "To"))
         if src and dst:
             out["route"] = f"{_titlecase(_no_code(src))} → {_titlecase(_no_code(dst))}"
 
     out["when"] = find_when(
-        text, ("Date of Journey", "Journey Date", "Departure", "Boarding Date", "Date"), base
+        text,
+        ("Date of Journey", "Journey Date", "Scheduled Departure", "Departure", "Boarding Date", "Date"),
+        base,
     )
     berth = re.search(
         r"\b(CNF|RAC|WL|GNWL|RLWL|PQWL|RSWL|TQWL)\b\s*/?\s*([A-Z]{1,2}\d{1,2})?\s*/?\s*(\d{1,3})?", text
@@ -395,8 +415,8 @@ def _train(text: str, base) -> dict:
 
 def _bus(text: str, base) -> dict:
     out: dict = {"details": []}
-    src = label_value(text, ("From", "Source", "Origin"))
-    dst = label_value(text, ("To", "Destination"))
+    src = _place(text, ("Source", "Origin", "From"))
+    dst = _place(text, ("Destination", "To"))
     if src and dst:
         out["route"] = f"{_titlecase(src)} → {_titlecase(dst)}"
     out["operator"] = label_value(text, ("Operator", "Bus Operator", "Travels", "Travel Name"))
@@ -434,6 +454,27 @@ def _title_from(subject: str, text: str, labels: tuple[str, ...]) -> str | None:
     return None
 
 
+_NOT_A_TITLE = re.compile(
+    r"(?i)^(?:booking|ticket|order|payment|amount|screen|seats?|date|time|show|hi|hello|dear|thank|your|"
+    r"confirm|e-?ticket|total|qty|quantity|category|from|to|subject)|@|https?:|^\W*$"
+)
+
+
+def _title_above(text: str, venue: str) -> str | None:
+    """Ticket mails (BookMyShow and the like) print the movie or event name on the line just above the
+    cinema and date lines, with no 'Movie:' label. Take the nearest plain line above the venue."""
+    lines = _lines(text)
+    try:
+        at = next(i for i, line in enumerate(lines) if venue[:30] in line)
+    except StopIteration:
+        return None
+    for line in reversed(lines[max(0, at - 3) : at]):
+        line = line.strip(" -–|:\"'")
+        if 2 <= len(line) <= 80 and not _NOT_A_TITLE.search(line) and not DATE_RE.search(line):
+            return line
+    return None
+
+
 def _movie_or_event(text: str, subject: str, base, kind: str) -> dict:
     out: dict = {"details": []}
     out["title"] = _title_from(
@@ -448,6 +489,8 @@ def _movie_or_event(text: str, subject: str, base, kind: str) -> dict:
         )
         venue = m.group(0).strip()[:90] if m else None
     out["venue"] = venue
+    if not out["title"] and venue:
+        out["title"] = _title_above(text, venue)
 
     when, has_time = find_when(
         text,
@@ -460,6 +503,8 @@ def _movie_or_event(text: str, subject: str, base, kind: str) -> dict:
         )
         if t:
             when, has_time = _parse(when.strftime("%d %b %Y"), t, base)
+    if not when:
+        when, has_time = find_any_date(text, base)
     out["when"] = (when, has_time)
 
     for label, keys in (
@@ -469,6 +514,8 @@ def _movie_or_event(text: str, subject: str, base, kind: str) -> dict:
         ("Category", ("Category", "Ticket Type")),
     ):
         value = label_value(text, keys)
+        if label == "Tickets" and value and not re.search(r"\d", value):
+            value = None  # the "TICKETS  AMOUNT" table header, not a count
         if value:
             out["details"].append((label, value))
     return out

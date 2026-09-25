@@ -7,7 +7,7 @@
 import { api } from './api.js';
 import { providerLabel } from './accounts.js';
 import { KPI_CATALOG } from './dashboard-catalog.js';
-import { focusPriority, renderExplorer, setSender } from './explorer.js';
+import { filteredEmails, focusPriority, renderExplorer, setSender, watchFilters } from './explorer.js';
 import { cssVar, getDashPrefs } from './settings.js';
 import { CATEGORY_COLORS, state } from './state.js';
 import { renderTripsCard, upcomingTrips } from './trips.js';
@@ -54,10 +54,16 @@ export async function loadDashActivities() {
     }
 }
 
+// With an inbox filter on, every number describes just that mail: the email counts directly, and the task
+// numbers count the tasks that came from those emails (tasks added by hand belong to no email).
 export function computeMetrics() {
-    const emails = state.emails;
+    const selected = filteredEmails();
+    const emails = selected || state.emails;
+    const ids = selected ? new Set(selected.map((e) => e.id)) : null;
     const today = localYmd(new Date());
     const m = {
+        filtered: Boolean(selected),
+        loaded: state.emails.length,
         total: emails.length,
         urgent: emails.filter((e) => e.category === URGENT).length,
         important: emails.filter((e) => e.category === 'Important').length,
@@ -72,7 +78,7 @@ export function computeMetrics() {
     m.busiest = emails.length ? byHour.indexOf(Math.max(...byHour)) : null;
 
     if (m.tasks) {
-        const all = state.dashActivities;
+        const all = ids ? state.dashActivities.filter((a) => a.email_id && ids.has(a.email_id)) : state.dashActivities;
         const open = all.filter((a) => a.start_at && a.status !== 'done');
         const weekAgo = localYmd(addDays(new Date(), -6));
         const weekAhead = localYmd(addDays(new Date(), 7));
@@ -125,7 +131,7 @@ const TILES = {
     },
     emails: (m) => ({
         label: 'Emails received', value: m.total, icon: 'inbox',
-        sub: m.total ? `About ${Math.max(1, Math.round(m.total / m.days))} a day` : 'No mail in this period',
+        sub: m.filtered ? `of ${m.loaded} in this period` : m.total ? `About ${Math.max(1, Math.round(m.total / m.days))} a day` : 'No mail in this period',
         tone: 'brand',
     }),
     important: (m) => ({
@@ -335,6 +341,9 @@ export function renderAll() {
 
 export function initKpis(wiring) {
     hooks = { ...hooks, ...wiring };
+
+    // The key numbers follow the inbox filters (priority, time bar, sender, search).
+    watchFilters(() => renderTiles(computeMetrics()));
 
     $('kpiGrid').addEventListener('click', (event) => {
         const tile = event.target.closest('[data-kpi]');

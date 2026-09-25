@@ -90,6 +90,17 @@ function matching(skip = '') {
 
 const anyFilter = () => Boolean(view.priority || view.bucket || view.sender || view.query.trim());
 
+// The mail the dashboard numbers should describe: everything the explorer's filters leave, or null when no
+// filter is on (the numbers then cover all mail). An "Ask" result replaces the loaded list, so it is used as is.
+export function filteredEmails() {
+    if (view.ask) return view.ask.items.filter((e) => !view.priority || e.category === view.priority);
+    return anyFilter() ? matching() : null;
+}
+
+// The dashboard registers here to redraw its key numbers whenever a filter is changed.
+let onFilterChange = () => {};
+export const watchFilters = (fn) => { onFilterChange = fn; };
+
 // --- rendering: chips + mix bar ------------------------------------------------------------------
 
 function renderChips() {
@@ -273,7 +284,7 @@ export function renderExplorer() {
 
 // --- actions --------------------------------------------------------------------------------------
 
-const refresh = () => { view.shown = PAGE_SIZE; renderExplorer(); };
+const refresh = () => { view.shown = PAGE_SIZE; renderExplorer(); onFilterChange(); };
 const reveal = () => $('card-inbox').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
 // Called from the KPI tiles ("Needs action" -> action-required mail).
