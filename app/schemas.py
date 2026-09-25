@@ -149,7 +149,7 @@ class EmailUpdate(BaseModel):
 
 
 class RuleIn(BaseModel):
-    kind: Literal["sender", "domain", "keyword"]
+    kind: Literal["sender", "domain", "keyword", "search"]
     pattern: str = Field(min_length=1, max_length=320)
     category: Literal["Urgent / Action Required", "Important", "General", "Promotional"]
 

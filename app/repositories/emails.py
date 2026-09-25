@@ -181,6 +181,17 @@ def list_matching_rule(db: Session, user_id: int, kind: str, pattern: str) -> li
                 Email.sender_address.like(f"%.{pattern}", escape="\\"),
             )
         )
+    elif kind == "search":
+        from ..services.rule_search import (  # the query language lives in the service layer
+            Document,
+            search_matches,
+        )
+
+        return [
+            e
+            for e in db.scalars(query)
+            if search_matches(pattern, Document(e.sender_address, e.subject, e.body))
+        ]
     else:
         # Text is encrypted in the database: candidates are matched here (callers re-check with the rule engine).
         needle = pattern.lower()

@@ -5,9 +5,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from .nlp_engine import CATEGORIES
+from .rule_search import Document, SearchError, compile_query, search_matches
 from .senders import sender_domain
 
-KINDS = ("sender", "domain", "keyword")
+KINDS = ("sender", "domain", "keyword", "search")
 MIN_KEYWORD_LENGTH = 3
 
 
@@ -31,7 +32,14 @@ def normalize(kind: str, pattern: str, category: str) -> RuleSpec:
     if category not in CATEGORIES:
         raise RuleError(f"Category must be one of: {', '.join(CATEGORIES)}")
 
-    pattern = " ".join((pattern or "").lower().split())
+    pattern = " ".join((pattern or "").split())
+    if kind == "search":  # keeps its case: OR / AND / NOT are operators only in capitals
+        try:
+            compile_query(pattern)
+        except SearchError as exc:
+            raise RuleError(str(exc)) from None
+        return RuleSpec(kind, pattern, category)
+    pattern = pattern.lower()
     if kind == "sender":
         if pattern.count("@") != 1 or pattern.startswith("@") or pattern.endswith("@") or " " in pattern:
             raise RuleError("Enter a full sender address such as news@shop.com")
@@ -53,7 +61,9 @@ def _domain_matches(address_domain: str, pattern: str) -> bool:
     return address_domain == pattern or address_domain.endswith("." + pattern)
 
 
-def matches(spec: RuleSpec, address: str, subject: str, body: str) -> bool:
+def matches(spec: RuleSpec, address: str, subject: str, body: str, doc: Document | None = None) -> bool:
+    if spec.kind == "search":
+        return search_matches(spec.pattern, doc or Document(address, subject, body))
     if spec.kind == "sender":
         return address == spec.pattern
     if spec.kind == "domain":
@@ -63,11 +73,12 @@ def matches(spec: RuleSpec, address: str, subject: str, body: str) -> bool:
 
 
 def match(specs: Iterable[RuleSpec], address: str, subject: str, body: str) -> RuleSpec | None:
-    """The most specific matching rule: a sender beats a domain, which beats a keyword."""
+    """The most specific matching rule: a sender beats a domain, then a keyword, then a search."""
     specs = list(specs)
+    doc = Document(address, subject, body) if any(s.kind == "search" for s in specs) else None  # folded once
     for kind in KINDS:
         for spec in specs:
-            if spec.kind == kind and matches(spec, address, subject, body):
+            if spec.kind == kind and matches(spec, address, subject, body, doc):
                 return spec
     return None
 
@@ -76,6 +87,8 @@ def describe(spec: RuleSpec) -> str:
     """Plain-English reason shown next to an email a rule decided."""
     if spec.kind == "sender" or spec.kind == "domain":
         target = f"mail from {spec.pattern}"
+    elif spec.kind == "search":
+        target = f"mail matching the search “{spec.pattern}”"
     else:
         target = f"mail mentioning “{spec.pattern}”"
     return f"Your rule: {target} is always {spec.category}."

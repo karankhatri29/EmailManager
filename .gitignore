@@ -31,3 +31,6 @@ htmlcov/
 *.db-shm
 *.db-wal
 *.bak-*
+
+# local launcher log
+local-server.log

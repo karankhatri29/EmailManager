@@ -135,7 +135,13 @@ async function renderFollowups(body) {
 
 // --- rules ---------------------------------------------------------------------------------------
 
-const KIND_LABEL = { sender: 'From', domain: 'Domain', keyword: 'Contains' };
+const KIND_LABEL = { sender: 'From', domain: 'Domain', keyword: 'Word', search: 'Search' };
+const PLACEHOLDER = {
+    sender: 'news@shop.com',
+    domain: 'shop.com',
+    keyword: 'a whole word, e.g. invoice',
+    search: 'invoice OR receipt -newsletter, "payment due", subject:urgent',
+};
 
 async function renderRules(body) {
     const rules = await api('/api/rules');
@@ -144,7 +150,7 @@ async function renderRules(body) {
             ${heading('Add a rule', 'Your rules always win over the automatic ranking. Mail you correct by hand is never overridden.')}
             <form id="ruleForm" class="grid grid-cols-1 sm:grid-cols-[8rem_1fr_12rem_auto] gap-2 items-center">
                 <select name="kind" class="field" aria-label="Rule type">${Object.entries(KIND_LABEL).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
-                <input name="pattern" required maxlength="320" class="field" placeholder="news@shop.com, shop.com, or a word" aria-label="Pattern">
+                <input name="pattern" required maxlength="320" class="field" placeholder="${esc(PLACEHOLDER.sender)}" aria-label="Pattern">
                 <select name="category" class="field" aria-label="Category">${CATEGORIES.map((c) => `<option>${esc(c)}</option>`).join('')}</select>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg cursor-pointer">Add</button>
             </form>
@@ -163,6 +169,7 @@ async function renderRules(body) {
             toast(`Rule added. ${made.affected} stored email${made.affected === 1 ? '' : 's'} changed.`, 'success');
             document.dispatchEvent(new CustomEvent('emailchanged'));
             render();
+            <p id="ruleHelp" class="text-xs text-slate-400 mt-2" hidden>Search finds mail that <em>contains</em> your words, ignoring case, accents and punctuation. Words must all appear; <b>OR</b> or <b>|</b> means either; <b>-word</b> or <b>NOT word</b> excludes; <b>"exact phrase"</b>; <b>(brackets)</b> to group; <b>subject:</b>, <b>from:</b>, <b>body:</b> to search one place; <b>=word</b> for a whole word only; <b>pay*ment</b> as a wildcard. Write OR, AND and NOT in capitals.</p>
         });
     });
 }
@@ -170,6 +177,11 @@ async function renderRules(body) {
 // --- events --------------------------------------------------------------------------------------
 
 async function onClick(event) {
+    const kindSelect = $('ruleForm').elements.kind;
+    kindSelect.addEventListener('change', () => {
+        $('ruleForm').elements.pattern.placeholder = PLACEHOLDER[kindSelect.value];
+        $('ruleHelp').hidden = kindSelect.value !== 'search';
+    });
     const t = event.target;
     const button = t.closest('button');
     const open = t.closest('[data-open]');

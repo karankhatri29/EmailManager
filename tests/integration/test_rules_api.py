@@ -149,6 +149,8 @@ def test_duplicate_rules_are_rejected(auth_client):
         {"kind": "regex", "pattern": ".*", "category": URGENT},
         {"kind": "keyword", "pattern": "", "category": URGENT},
         {"kind": "keyword", "category": URGENT},
+        {"kind": "search", "pattern": "-only -negative", "category": URGENT},
+        {"kind": "search", "pattern": '(unclosed OR "quote', "category": URGENT},
     ],
 )
 def test_invalid_rules_are_rejected(auth_client, payload):
@@ -199,3 +201,11 @@ def test_new_mail_is_classified_with_the_users_rules(auth_client, account, manag
 
 
 from unittest.mock import patch  # noqa: E402
+
+
+def test_search_rule_can_be_created(auth_client):
+    response = auth_client.post(
+        "/api/rules", json={"kind": "search", "pattern": "invoice OR receipt -newsletter", "category": URGENT}
+    )
+    assert response.status_code == 201
+    assert response.json()["pattern"] == "invoice OR receipt -newsletter"

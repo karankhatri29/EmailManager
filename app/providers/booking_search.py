@@ -16,7 +16,7 @@ from googleapiclient.errors import HttpError
 from ..services.bookings import SENDERS
 from ..services.html_text import html_to_text, looks_like_html
 from .base import ProviderAuthError
-from .gmail import GmailProvider, _parse_date, _safe_b64decode
+from .gmail import GmailProvider, _parse_date, _safe_b64decode, is_auth_failure
 from .microsoft import MicrosoftProvider, _format_sender, _short_id
 from .microsoft import _parse_date as _parse_graph_date
 
@@ -49,7 +49,7 @@ def _gmail_guard(fn):
     except RefreshError as exc:
         raise ProviderAuthError(f"Google rejected the saved login: {exc}") from exc
     except HttpError as exc:
-        if exc.resp is not None and exc.resp.status in (401, 403):
+        if is_auth_failure(exc):
             raise ProviderAuthError(f"Gmail access denied (HTTP {exc.resp.status})") from exc
         raise
 

@@ -1,5 +1,6 @@
 import base64
 import json
+import time
 from datetime import datetime, timezone
 
 from google.auth.exceptions import RefreshError
@@ -14,6 +15,7 @@ from .common import parse_list_unsubscribe
 
 PAGE_SIZE = 100  # ids per list call (Gmail allows up to 500)
 BATCH_SIZE = 25  # messages per batched HTTP request
+RETRY_DELAYS = (1, 2, 4)  # seconds to wait before retrying a message Google rate-limited
 MAX_BODY_CHARS = 4000
 SENT_THREAD_LIMIT = 40
 RECEIVED_ONLY = " -in:sent -in:drafts"  # the inbox view of mail: not your own sent mail or drafts
@@ -116,10 +118,51 @@ def _parse_message(msg_detail, message_id):
     }
 
 
+def is_auth_failure(exc: HttpError) -> bool:
+    """True when Gmail refused the login itself (401, or a 403 about permissions).
+
+    A 403 is also how Google reports rate limits ("rateLimitExceeded", "userRateLimitExceeded", quota), which
+    says nothing about the login and must not make the mailbox ask for a reconnect.
+    """
+    status = exc.resp.status if exc.resp is not None else None
+    if status == 401:
+        return True
+    if status != 403:
+        return False
+    try:
+        detail = json.loads(exc.content or b"{}").get("error", {})
+        reasons = [str(e.get("reason", "")) for e in detail.get("errors", [])]
+        reasons.append(str(detail.get("status", "")))
+    except (ValueError, AttributeError):
+        reasons = []
+    return not any("limit" in r.lower() or "quota" in r.lower() for r in reasons)
+
+
+def _is_rate_limited(exc: Exception) -> bool:
+    return (
+        isinstance(exc, HttpError)
+        and exc.resp is not None
+        and exc.resp.status in (403, 429, 500, 503)
+        and not is_auth_failure(exc)
+    )
+
+
 def fetch_message(service, message_id):
     """Downloads one message as a dict (see _parse_message)."""
     msg_detail = service.users().messages().get(userId="me", id=message_id, format="full").execute()
     return _parse_message(msg_detail, message_id)
+
+
+def _fetch_with_backoff(service, message_id):
+    """One message, retried with a pause when Google says "slow down"."""
+    for delay in RETRY_DELAYS:
+        try:
+            return fetch_message(service, message_id)
+        except HttpError as exc:
+            if not _is_rate_limited(exc):
+                raise
+            time.sleep(delay)
+    return fetch_message(service, message_id)
 
 
 def fetch_messages(service, message_ids, batch_size=BATCH_SIZE):
@@ -146,13 +189,9 @@ def fetch_messages(service, message_ids, batch_size=BATCH_SIZE):
         batch.execute()
 
     for message_id, exception in failures.items():
-        if (
-            isinstance(exception, HttpError)
-            and exception.resp is not None
-            and exception.resp.status in (401, 403)
-        ):
+        if isinstance(exception, HttpError) and is_auth_failure(exception):
             raise exception
-        results[message_id] = fetch_message(service, message_id)  # one retry, on its own
+        results[message_id] = _fetch_with_backoff(service, message_id)  # retried on its own, gently
 
     return [results[m] for m in message_ids if m in results]
 
@@ -229,7 +268,7 @@ class GmailProvider:
         except RefreshError as exc:
             raise ProviderAuthError(f"Google rejected the saved login: {exc}") from exc
         except HttpError as exc:
-            if exc.resp is not None and exc.resp.status in (401, 403):
+            if is_auth_failure(exc):
                 raise ProviderAuthError(f"Gmail access denied (HTTP {exc.resp.status})") from exc
             raise
 
